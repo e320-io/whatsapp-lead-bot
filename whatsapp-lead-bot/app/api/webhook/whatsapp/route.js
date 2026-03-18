@@ -106,18 +106,30 @@ export async function POST(request) {
     var availabilityInfo = ''
     if (wantsToBook && activeBranch?.name) {
       try {
-     var todayMx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
-var todayStr = todayMx.getFullYear() + '-' + String(todayMx.getMonth() + 1).padStart(2, '0') + '-' + String(todayMx.getDate()).padStart(2, '0')
-availabilityInfo = '\n\nFECHA DE HOY: ' + todayStr + ' (usa esto como referencia, estamos en MARZO 2026)'
-availabilityInfo += '\nDISPONIBILIDAD REAL DE AGENDA (' + activeBranch.name + ') - próximos 14 días:\n' + avail
+        var avail = await getAvailabilityForDays(activeBranch.name, 14)
+
+        var todayMx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
+        var dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+        var meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+        var todayStr = todayMx.getFullYear() + '-' + String(todayMx.getMonth() + 1).padStart(2, '0') + '-' + String(todayMx.getDate()).padStart(2, '0')
+        var todayNatural = dias[todayMx.getDay()] + ' ' + todayMx.getDate() + ' de ' + meses[todayMx.getMonth()] + ' de ' + todayMx.getFullYear()
+
+        availabilityInfo = '\n\nFECHA DE HOY: ' + todayStr + ' (' + todayNatural + ')'
+        availabilityInfo += '\nIMPORTANTE: Estamos en MARZO 2026. Cuando digas fechas, usa el mes correcto (marzo). "Mañana" es ' + dias[(todayMx.getDay() + 1) % 7] + ' ' + (todayMx.getDate() + 1) + ' de marzo.'
+        availabilityInfo += '\nDISPONIBILIDAD REAL DE AGENDA (' + activeBranch.name + ') - próximos 14 días:\n' + avail
         availabilityInfo += '\n\nINSTRUCCIONES DE AGENDAMIENTO:'
         availabilityInfo += '\n- Ofrece 2-3 horarios específicos del día que pida el prospecto.'
-        availabilityInfo += '\n- Cuando confirme horario, responde EXACTAMENTE con este formato en tu mensaje:'
+        availabilityInfo += '\n- Usa SOLO las fechas que aparecen arriba. NUNCA inventes una fecha.'
+        availabilityInfo += '\n- Cuando confirme horario, responde con este formato en tu mensaje:'
         availabilityInfo += '\n  [CREAR_CITA|fecha|hora|servicio|nombre]'
-        availabilityInfo += '\n  Ejemplo: [CREAR_CITA|2026-03-25|11:00|Primera sesión depilación láser|María López]'
+        availabilityInfo += '\n  Ejemplo: [CREAR_CITA|2026-03-25|11:00|Combo Axilas|María López]'
+        availabilityInfo += '\n- La fecha DEBE ser formato YYYY-MM-DD. La hora DEBE ser formato HH:MM.'
+        availabilityInfo += '\n- El servicio debe ser el que el prospecto eligió en la conversación.'
         availabilityInfo += '\n- Además del código, escribe un mensaje bonito confirmando la cita.'
-        availabilityInfo += '\n- Si pide un día sin disponibilidad, ofrece el día más cercano que sí tenga.'
-        availabilityInfo += '\n- NO preguntes si es valoración o tratamiento. Asume primera sesión del servicio que le interesó en la conversación.'
+        availabilityInfo += '\n- NO preguntes si es valoración o tratamiento. Asume primera sesión del servicio que eligió.'
+        availabilityInfo += '\n- Si no tienes el nombre del prospecto, PÍDELO antes de agendar.'
+
+        console.log('Disponibilidad consultada para ' + activeBranch.name + ':', avail.substring(0, 200))
       } catch (err) {
         console.error('Error consultando disponibilidad:', err)
       }
@@ -141,27 +153,26 @@ availabilityInfo += '\nDISPONIBILIDAD REAL DE AGENDA (' + activeBranch.name + ')
     var citaMatch = botReply.match(/\[CREAR_CITA\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
     if (citaMatch) {
       var citaData = {
-        fecha: citaMatch[1],
-        hora: citaMatch[2],
-        servicio: citaMatch[3],
-        nombre: citaMatch[4],
+        fecha: citaMatch[1].trim(),
+        hora: citaMatch[2].trim(),
+        servicio: citaMatch[3].trim(),
+        nombre: citaMatch[4].trim(),
         sucursal: activeBranch?.name || 'Polanco',
         telefono: phoneNumber
       }
 
-      console.log('Creando cita:', citaData)
+      console.log('Creando cita:', JSON.stringify(citaData))
       var citaResult = await createAppointment(citaData)
 
       if (citaResult.success) {
-        console.log('Cita creada exitosamente:', citaResult.cita?.id)
+        console.log('CITA CREADA EXITOSAMENTE - ID:', citaResult.cita?.id)
         await supabase.from('leads').update({ stage: 'cita_agendada', updated_at: new Date().toISOString() }).eq('id', lead.id)
       } else {
-        console.error('Error creando cita:', citaResult.error)
+        console.error('ERROR CREANDO CITA:', citaResult.error)
         botReply = botReply + '\n\n(Hubo un problema al agendar, una asesora te confirmará en breve)'
         shouldEscalate = true
       }
 
-      // Quitar el código de la respuesta visible
       botReply = botReply.replace(/\[CREAR_CITA\|[^\]]+\]/g, '').trim()
     }
 
