@@ -106,8 +106,10 @@ export async function POST(request) {
     var availabilityInfo = ''
     if (wantsToBook && activeBranch?.name) {
       try {
-        var avail = await getAvailabilityForDays(activeBranch.name, 14)
-        availabilityInfo = '\n\nDISPONIBILIDAD REAL DE AGENDA (' + activeBranch.name + ') - próximos 14 días:\n' + avail
+     var todayMx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
+var todayStr = todayMx.getFullYear() + '-' + String(todayMx.getMonth() + 1).padStart(2, '0') + '-' + String(todayMx.getDate()).padStart(2, '0')
+availabilityInfo = '\n\nFECHA DE HOY: ' + todayStr + ' (usa esto como referencia, estamos en MARZO 2026)'
+availabilityInfo += '\nDISPONIBILIDAD REAL DE AGENDA (' + activeBranch.name + ') - próximos 14 días:\n' + avail
         availabilityInfo += '\n\nINSTRUCCIONES DE AGENDAMIENTO:'
         availabilityInfo += '\n- Ofrece 2-3 horarios específicos del día que pida el prospecto.'
         availabilityInfo += '\n- Cuando confirme horario, responde EXACTAMENTE con este formato en tu mensaje:'
