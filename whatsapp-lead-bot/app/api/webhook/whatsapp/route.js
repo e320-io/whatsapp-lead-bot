@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
 import { sendWhatsAppMessage, markAsRead } from '@/lib/whatsapp'
 import { generateBotResponse } from '@/lib/claude'
+import { getAvailabilityText } from '@/lib/pos'
 
-// GET: Verificación del webhook (360Dialog envía GET para validar)
+// GET: Verificación del webhook
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const mode = searchParams.get('hub.mode')
@@ -24,12 +25,10 @@ export async function POST(request) {
     const body = await request.json()
     console.log('Webhook recibido:', JSON.stringify(body, null, 2))
 
-    // Extraer mensaje del payload de 360Dialog / Meta
     const entry = body.entry?.[0]
     const changes = entry?.changes?.[0]
     const value = changes?.value
 
-    // Ignorar si no es un mensaje
     if (!value?.messages?.[0]) {
       return NextResponse.json({ status: 'no_message' })
     }
@@ -41,7 +40,6 @@ export async function POST(request) {
     const messageText = message.text?.body || ''
     const businessPhoneId = value.metadata?.phone_number_id || null
 
-    // Solo procesamos mensajes de texto por ahora
     if (message.type !== 'text') {
       await sendWhatsAppMessage(
         phoneNumber,
@@ -50,13 +48,12 @@ export async function POST(request) {
       return NextResponse.json({ status: 'non_text_handled' })
     }
 
-    // Marcar como leído
-    await markAsRead(message.id).catch(() => {})
+    await markAsRead(message.id).catch(function () {})
 
     const supabase = createSupabaseAdmin()
 
     // ==========================================
-    // 1. Identificar negocio y sucursal por número de WhatsApp
+    // 1. Identificar negocio y sucursal
     // ==========================================
     const { data: branch } = await supabase
       .from('branches')
@@ -65,7 +62,6 @@ export async function POST(request) {
       .eq('is_active', true)
       .single()
 
-    // Si no encontramos por número, buscar el negocio principal (modo desarrollo)
     let business = branch?.businesses
     let activeBranch = branch
 
@@ -83,7 +79,6 @@ export async function POST(request) {
         return NextResponse.json({ error: 'No business' }, { status: 500 })
       }
 
-      // Buscar sucursal activa del negocio
       const { data: fallbackBranch } = await supabase
         .from('branches')
         .select('*')
@@ -178,10 +173,48 @@ export async function POST(request) {
       .select('role, content')
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: true })
-      .limit(20) // últimos 20 mensajes para contexto
+      .limit(20)
 
     // ==========================================
-    // 6. Generar respuesta con Claude
+    // 6. Consultar disponibilidad si el lead quiere agendar
+    // ==========================================
+    const lastMessage = messageText.toLowerCase()
+    const bookingKeywords = ['agendar', 'cita', 'horario', 'disponibilidad', 'día', 'mañana', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'agenda', 'cuando', 'cuándo', 'puedo ir', 'tienen espacio', 'hay lugar']
+    const wantsToBook = bookingKeywords.some(function (kw) { return lastMessage.includes(kw) })
+
+    let availabilityInfo = ''
+    if (wantsToBook && activeBranch?.name) {
+      try {
+        const today = new Date()
+        const tomorrow = new Date(today)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const dayAfter = new Date(today)
+        dayAfter.setDate(dayAfter.getDate() + 2)
+
+        const todayStr = today.toISOString().split('T')[0]
+        const tomorrowStr = tomorrow.toISOString().split('T')[0]
+        const dayAfterStr = dayAfter.toISOString().split('T')[0]
+
+        const todayAvail = await getAvailabilityText(activeBranch.name, todayStr)
+        const tomorrowAvail = await getAvailabilityText(activeBranch.name, tomorrowStr)
+        const dayAfterAvail = await getAvailabilityText(activeBranch.name, dayAfterStr)
+
+        const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+
+        availabilityInfo = '\n\nDISPONIBILIDAD REAL DE AGENDA (' + activeBranch.name + '):'
+        availabilityInfo += '\nHOY ' + dias[today.getDay()] + ' (' + todayStr + '): ' + todayAvail
+        availabilityInfo += '\nMAÑANA ' + dias[tomorrow.getDay()] + ' (' + tomorrowStr + '): ' + tomorrowAvail
+        availabilityInfo += '\nPASADO MAÑANA ' + dias[dayAfter.getDay()] + ' (' + dayAfterStr + '): ' + dayAfterAvail
+        availabilityInfo += '\nUsa esta información para ofrecer horarios reales. Si pide otro día, dile que le confirmas con la recepcionista.'
+
+        console.log('Disponibilidad consultada:', availabilityInfo)
+      } catch (err) {
+        console.error('Error consultando disponibilidad:', err)
+      }
+    }
+
+    // ==========================================
+    // 7. Generar respuesta con Claude
     // ==========================================
     const branchConfig = activeBranch?.config || business.config || {}
     const branchInfo = activeBranch
@@ -189,14 +222,14 @@ export async function POST(request) {
       : {}
 
     const { text: botReply, shouldEscalate } = await generateBotResponse(
-      business.system_prompt,
+      business.system_prompt + availabilityInfo,
       history || [],
       { name: lead.name, stage: lead.stage, metadata: { ...lead.metadata, ...branchInfo } },
       branchConfig
     )
 
     // ==========================================
-    // 7. Manejar escalamiento
+    // 8. Manejar escalamiento
     // ==========================================
     if (shouldEscalate) {
       await supabase
@@ -209,12 +242,11 @@ export async function POST(request) {
         .update({ stage: 'escalado', updated_at: new Date().toISOString() })
         .eq('id', lead.id)
 
-      // TODO: Notificar a recepcionista (email, SMS, o webhook)
-      console.log(`⚠️ Lead ${lead.phone} escalado a humano - Sucursal: ${activeBranch?.name}`)
+      console.log('⚠️ Lead ' + lead.phone + ' escalado a humano - Sucursal: ' + (activeBranch?.name || 'N/A'))
     }
 
     // ==========================================
-    // 8. Guardar respuesta del bot
+    // 9. Guardar respuesta del bot
     // ==========================================
     await supabase.from('messages').insert({
       conversation_id: conversation.id,
@@ -224,12 +256,12 @@ export async function POST(request) {
     })
 
     // ==========================================
-    // 9. Enviar respuesta por WhatsApp
+    // 10. Enviar respuesta por WhatsApp
     // ==========================================
     await sendWhatsAppMessage(phoneNumber, botReply)
 
     // ==========================================
-    // 10. Actualizar etapa del lead si es nuevo
+    // 11. Actualizar etapa del lead
     // ==========================================
     if (lead.stage === 'nuevo' && history && history.length > 2) {
       await supabase
