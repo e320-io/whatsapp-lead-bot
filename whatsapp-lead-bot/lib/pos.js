@@ -13,11 +13,22 @@ var SUCURSALES = {
   'Metepec': 5
 }
 
-var DURACIONES = {
-  'facial': 90,
-  'fullface': 90,
-  'hifu': 90,
-  'default': 60
+function getMexicoDate(daysFromNow) {
+  var now = new Date()
+  var mexicoOffset = -6 * 60
+  var utcMinutes = now.getTime() + now.getTimezoneOffset() * 60000
+  var mexicoTime = new Date(utcMinutes + mexicoOffset * 60000)
+  if (daysFromNow) {
+    mexicoTime.setDate(mexicoTime.getDate() + daysFromNow)
+  }
+  return mexicoTime
+}
+
+function formatDate(date) {
+  var y = date.getFullYear()
+  var m = String(date.getMonth() + 1).padStart(2, '0')
+  var d = String(date.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + d
 }
 
 function getDuracion(servicio) {
@@ -26,6 +37,14 @@ function getDuracion(servicio) {
   if (s.includes('facial') || s.includes('fullface')) return 90
   if (s.includes('hifu')) return 90
   return 60
+}
+
+function getTipoServicio(servicio) {
+  if (!servicio) return 'laser'
+  var s = servicio.toLowerCase()
+  if (s.includes('facial') || s.includes('fullface') || s.includes('limpieza')) return 'facial_full'
+  if (s.includes('hifu')) return 'hifu'
+  return 'laser'
 }
 
 export async function getAvailableSlots(sucursalNombre, fecha) {
@@ -45,7 +64,9 @@ export async function getAvailableSlots(sucursalNombre, fecha) {
   }
 
   var citas = result.data || []
-  var dayOfWeek = new Date(fecha + 'T12:00:00').getDay()
+  var dateParts = fecha.split('-')
+  var dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]))
+  var dayOfWeek = dateObj.getDay()
   if (dayOfWeek === 0) return []
 
   var horaApertura = 10
@@ -83,9 +104,8 @@ export async function getAvailabilityForDays(sucursalNombre, numDays) {
   var dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
   for (var i = 0; i < numDays; i++) {
-    var date = new Date()
-    date.setDate(date.getDate() + i)
-    var dateStr = date.toISOString().split('T')[0]
+    var date = getMexicoDate(i)
+    var dateStr = formatDate(date)
     var dayName = dias[date.getDay()]
 
     if (date.getDay() === 0) continue
@@ -114,6 +134,8 @@ export async function createAppointment(data) {
   }
 
   var duracion = getDuracion(data.servicio)
+  var tipoServicio = getTipoServicio(data.servicio)
+
   var startParts = data.hora.split(':')
   var startH = parseInt(startParts[0])
   var startM = parseInt(startParts[1])
@@ -127,30 +149,35 @@ export async function createAppointment(data) {
     return { success: false, error: 'Ese horario ya no está disponible' }
   }
 
+  var insertData = {
+    clienta_nombre: data.nombre || 'Lead WhatsApp',
+    sucursal_id: sucursalId,
+    sucursal_nombre: data.sucursal,
+    servicio: data.servicio || 'Primera sesión depilación láser',
+    tipo_servicio: tipoServicio,
+    duracion_min: duracion,
+    fecha: data.fecha,
+    hora_inicio: data.hora,
+    hora_fin: horaFin,
+    sesion_numero: 1,
+    es_cobro: true,
+    estado: 'agendada',
+    notas: 'Agendada por WhatsApp Bot - Tel: ' + (data.telefono || 'N/A')
+  }
+
+  console.log('Insertando cita en POS:', JSON.stringify(insertData))
+
   var result = await posSupabase
     .from('citas')
-    .insert({
-      clienta_nombre: data.nombre || 'Lead WhatsApp',
-      sucursal_id: sucursalId,
-      sucursal_nombre: data.sucursal,
-      servicio: data.servicio || 'Primera sesión depilación láser',
-      tipo_servicio: 'depilacion',
-      duracion_min: duracion,
-      fecha: data.fecha,
-      hora_inicio: data.hora,
-      hora_fin: horaFin,
-      sesion_numero: 1,
-      es_cobro: false,
-      estado: 'agendada',
-      notas: 'Agendada por WhatsApp Bot - Tel: ' + (data.telefono || 'N/A')
-    })
+    .insert(insertData)
     .select()
     .single()
 
   if (result.error) {
-    console.error('Error creando cita:', result.error)
+    console.error('Error creando cita en POS:', JSON.stringify(result.error))
     return { success: false, error: result.error.message }
   }
 
+  console.log('Cita creada exitosamente:', result.data.id)
   return { success: true, cita: result.data }
 }
