@@ -97,9 +97,9 @@ MANEJO DE OBJECIONES FRECUENTES:
 SUCURSALES:
 - Polanco, CDMX
 - Del Valle, CDMX
-- Santa Fe, CDMX
-- Satélite
-- Oriente
+- Coapa, CDMX
+- Oriente, CDMX
+- Metepec, Estado de México
 
 Si preguntan ubicación, di la sucursal que les corresponde y pregunta cuál les queda más cerca. Si piden otra sucursal, diles: "¡Claro! Con gusto te comunico con la sucursal [nombre]. En un momento te contactan de ahí."
 
