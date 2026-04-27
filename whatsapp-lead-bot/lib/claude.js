@@ -31,7 +31,7 @@ INFORMACIÓN DEL PROSPECTO:
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 300,
       system: fullSystemPrompt,
       messages: messages,
@@ -45,7 +45,9 @@ INFORMACIÓN DEL PROSPECTO:
       shouldEscalate,
     }
   } catch (error) {
-    console.error('Error con Claude API:', error)
+    console.error('Error con Claude API - mensaje:', error.message)
+    console.error('Error con Claude API - status:', error.status)
+    console.error('Error con Claude API - completo:', JSON.stringify(error, null, 2))
     return {
       text: '¡Gracias por escribirnos! En este momento estoy teniendo dificultades técnicas. Una de nuestras asesoras te contactará en breve. 🙏',
       shouldEscalate: true,
