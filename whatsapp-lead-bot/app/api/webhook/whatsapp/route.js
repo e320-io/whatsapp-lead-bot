@@ -3,6 +3,7 @@ import { createSupabaseAdmin } from '@/lib/supabase'
 import { sendWhatsAppMessage, markAsRead } from '@/lib/whatsapp'
 import { generateBotResponse } from '@/lib/claude'
 import { getAvailabilityForDays, createAppointment } from '@/lib/pos'
+import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hubspot'
 
 export async function GET(request) {
   var url = new URL(request.url)
@@ -43,7 +44,19 @@ export async function POST(request) {
 
     await markAsRead(message.id).catch(function () {})
 
-    var supabase = createSupabaseAdmin()
+    // Deduplicación: ignorar si ya procesamos este message.id de WhatsApp
+    var supabaseDedup = createSupabaseAdmin()
+    var dedupResult = await supabaseDedup
+      .from('messages')
+      .select('id')
+      .eq('whatsapp_message_id', message.id)
+      .limit(1)
+    if (dedupResult.data && dedupResult.data.length > 0) {
+      console.log('Mensaje duplicado ignorado:', message.id)
+      return NextResponse.json({ status: 'duplicate' })
+    }
+
+    var supabase = supabaseDedup
 
     // 1. Identificar negocio y sucursal
     var branchResult = await supabase
@@ -77,6 +90,33 @@ export async function POST(request) {
       lead.name = contactName
     }
 
+    // Sincronizar con HubSpot (no bloquea el flujo si falla)
+    var hubspotContactId = lead.metadata?.hubspot_contact_id || null
+    var hubspotDealId = lead.metadata?.hubspot_deal_id || null
+    try {
+      if (!hubspotContactId) {
+        hubspotContactId = await findOrCreateContact({ phone: phoneNumber, name: lead.name })
+      }
+      if (!hubspotDealId) {
+        hubspotDealId = await findOrCreateDeal({
+          contactId: hubspotContactId,
+          phone: phoneNumber,
+          name: lead.name,
+          stage: lead.stage,
+        })
+      }
+      if (hubspotContactId !== lead.metadata?.hubspot_contact_id || hubspotDealId !== lead.metadata?.hubspot_deal_id) {
+        await supabase.from('leads').update({
+          metadata: Object.assign({}, lead.metadata || {}, {
+            hubspot_contact_id: hubspotContactId,
+            hubspot_deal_id: hubspotDealId,
+          })
+        }).eq('id', lead.id)
+      }
+    } catch (hsErr) {
+      console.error('HubSpot sync error:', hsErr.message)
+    }
+
     // 3. Buscar o crear conversación
     var convResult = await supabase.from('conversations').select('*').eq('lead_id', lead.id).eq('status', 'activa').order('created_at', { ascending: false }).limit(1).single()
     var conversation = convResult.data
@@ -91,7 +131,8 @@ export async function POST(request) {
 
     // 4. Guardar mensaje
     await supabase.from('messages').insert({
-      conversation_id: conversation.id, business_id: business.id, role: 'lead', content: messageText
+      conversation_id: conversation.id, business_id: business.id, role: 'lead', content: messageText,
+      whatsapp_message_id: message.id
     })
 
     // 5. Cargar historial
@@ -167,6 +208,7 @@ export async function POST(request) {
       if (citaResult.success) {
         console.log('CITA CREADA EXITOSAMENTE - ID:', citaResult.cita?.id)
         await supabase.from('leads').update({ stage: 'cita_agendada', updated_at: new Date().toISOString() }).eq('id', lead.id)
+        if (hubspotDealId) updateDealStage(hubspotDealId, 'cita_agendada').catch((e) => console.error('HubSpot stage update:', e.message))
       } else {
         console.error('ERROR CREANDO CITA:', citaResult.error)
         botReply = botReply + '\n\n(Hubo un problema al agendar, una asesora te confirmará en breve)'
@@ -180,6 +222,7 @@ export async function POST(request) {
     if (shouldEscalate) {
       await supabase.from('conversations').update({ status: 'escalada', escalated_at: new Date().toISOString() }).eq('id', conversation.id)
       await supabase.from('leads').update({ stage: 'escalado', updated_at: new Date().toISOString() }).eq('id', lead.id)
+      if (hubspotDealId) updateDealStage(hubspotDealId, 'escalado').catch((e) => console.error('HubSpot stage update:', e.message))
       console.log('⚠️ Lead ' + lead.phone + ' escalado - Sucursal: ' + (activeBranch?.name || 'N/A'))
     }
 
@@ -192,6 +235,7 @@ export async function POST(request) {
     // 11. Actualizar etapa
     if (lead.stage === 'nuevo' && history.length > 2) {
       await supabase.from('leads').update({ stage: 'en_conversacion', updated_at: new Date().toISOString() }).eq('id', lead.id)
+      if (hubspotDealId) updateDealStage(hubspotDealId, 'en_conversacion').catch((e) => console.error('HubSpot stage update:', e.message))
     }
 
     return NextResponse.json({ status: 'ok', escalated: shouldEscalate })
