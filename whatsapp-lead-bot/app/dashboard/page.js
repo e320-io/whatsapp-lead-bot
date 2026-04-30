@@ -239,7 +239,7 @@ export default function Dashboard() {
 
         {/* ── TAB: PIPELINE CRM ── */}
         {tab === 'pipeline' && (
-          <div style={{ display: 'flex', gap: '12px', padding: '16px', overflowX: 'auto', flex: selected ? '0 0 auto' : '1', maxWidth: selected ? '60%' : '100%' }}>
+          <div style={{ display: 'flex', gap: '12px', padding: '16px', overflowX: 'auto', flex: '0 0 auto', width: selected ? '55%' : '100%', maxWidth: selected ? '55%' : '100%', transition: 'width 0.2s' }}>
             {STAGES.map((stage) => {
               const stageLeads = byStage[stage.key] || []
               return (
@@ -323,15 +323,13 @@ export default function Dashboard() {
         )}
 
         {/* ── PANEL DERECHO: CONVERSACIÓN ── */}
-        {!selected ? (
+        {!selected && tab === 'conversaciones' ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
             <div style={{ fontSize: '56px', marginBottom: '16px' }}>💬</div>
-            <div style={{ fontSize: '18px', fontWeight: '600', color: '#374151' }}>
-              {tab === 'pipeline' ? 'Haz click en un card' : 'Selecciona un lead'}
-            </div>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#374151' }}>Selecciona un lead</div>
             <div style={{ fontSize: '14px', marginTop: '8px' }}>para ver la conversación completa</div>
           </div>
-        ) : (
+        ) : selected ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             {/* Header chat */}
             <div style={{ padding: '12px 20px', background: '#075e54', display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -418,7 +416,7 @@ export default function Dashboard() {
               Vista de solo lectura · {messages.length} mensajes en {conversations.length} sesión{conversations.length !== 1 ? 'es' : ''}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   )
