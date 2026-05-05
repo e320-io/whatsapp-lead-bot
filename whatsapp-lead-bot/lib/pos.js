@@ -139,6 +139,100 @@ export function getClabeInfo(sucursalNombre) {
   return CLABE_POR_SUCURSAL[sucursalNombre] || null
 }
 
+export async function createPreventaPaquete(data) {
+  var sucursalId = SUCURSALES[data.sucursal]
+  if (!sucursalId) return { success: false, error: 'Sucursal no encontrada' }
+
+  var dateRegex = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRegex.test(data.fecha)) return { success: false, error: 'Formato de fecha inválido: ' + data.fecha }
+
+  var duracion = getDuracion(data.servicio)
+  var tipoServicio = getTipoServicio(data.servicio)
+
+  var startParts = data.hora.split(':')
+  var startH = parseInt(startParts[0])
+  var startM = parseInt(startParts[1])
+  var endMinutes = startH * 60 + startM + duracion
+  var endH = Math.floor(endMinutes / 60)
+  var endM = endMinutes % 60
+  var horaFin = String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0')
+
+  var slots = await getAvailableSlots(data.sucursal, data.fecha)
+  if (!slots.includes(data.hora)) return { success: false, error: 'Ese horario ya no está disponible' }
+
+  var precioTotal = data.precio_total || 0
+  var montoInicial = data.monto_inicial || Math.round(precioTotal / 2)
+  var pendiente = precioTotal - montoInicial
+
+  // 1. Crear paquete con campos de preventa
+  var paqueteResult = await posSupabase.from('paquetes').insert({
+    clienta_nombre: data.nombre || 'Lead WhatsApp',
+    sucursal_id: sucursalId,
+    sucursal_nombre: data.sucursal,
+    servicio: data.servicio || 'Primera sesión',
+    precio: precioTotal,
+    es_preventa: true,
+    preventa_monto_inicial: montoInicial,
+    preventa_pendiente: pendiente,
+    preventa_fecha_limite: '2026-05-31',
+    preventa_liquidado: false,
+    preventa_vencida: false,
+    activo: true,
+    telefono: data.telefono || null,
+  }).select().single()
+
+  if (paqueteResult.error) {
+    console.error('Error creando paquete preventa:', JSON.stringify(paqueteResult.error))
+    return { success: false, error: paqueteResult.error.message }
+  }
+
+  var paquete = paqueteResult.data
+
+  // 2. Crear ticket del pago inicial (best-effort)
+  try {
+    await posSupabase.from('tickets').insert({
+      sucursal_id: sucursalId,
+      sucursal_nombre: data.sucursal,
+      servicios: [data.servicio || 'Primera sesión'],
+      total: montoInicial,
+      metodo_pago: 'Preventa Hot Sale · Transferencia',
+      tipo_clienta: 'Nueva',
+      paquete_id: paquete.id,
+    })
+  } catch (ticketErr) {
+    console.error('No se pudo crear ticket preventa (no crítico):', ticketErr)
+  }
+
+  // 3. Crear cita ligada al paquete
+  var es50Porciento = montoInicial >= precioTotal / 2
+  var citaResult = await posSupabase.from('citas').insert({
+    clienta_nombre: data.nombre || 'Lead WhatsApp',
+    sucursal_id: sucursalId,
+    sucursal_nombre: data.sucursal,
+    servicio: data.servicio || 'Primera sesión',
+    tipo_servicio: tipoServicio,
+    duracion_min: duracion,
+    fecha: data.fecha,
+    hora_inicio: data.hora,
+    hora_fin: horaFin,
+    sesion_numero: 1,
+    es_cobro: false,
+    estado: 'agendada',
+    paquete_id: paquete.id,
+    anticipo_metodo: 'Preventa Hot Sale · Transferencia',
+    anticipo_monto: montoInicial,
+    notas: 'Preventa Hot Sale · ' + (es50Porciento ? '50% pagado $' + montoInicial : 'Anticipo $' + montoInicial) + ' · Pendiente $' + pendiente + ' · Tel: ' + (data.telefono || 'N/A'),
+  }).select().single()
+
+  if (citaResult.error) {
+    console.error('Error creando cita preventa:', JSON.stringify(citaResult.error))
+    return { success: false, error: citaResult.error.message }
+  }
+
+  console.log('Preventa creada — paquete:', paquete.id, '| cita:', citaResult.data.id)
+  return { success: true, paquete, cita: citaResult.data }
+}
+
 export async function createAppointmentWithAnticipo(data) {
   var sucursalId = SUCURSALES[data.sucursal]
   if (!sucursalId) return { success: false, error: 'Sucursal no encontrada' }

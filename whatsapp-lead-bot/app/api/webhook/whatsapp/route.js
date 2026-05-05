@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
 import { sendWhatsAppMessage, markAsRead } from '@/lib/whatsapp'
 import { generateBotResponse } from '@/lib/claude'
-import { getAvailabilityForDays, createAppointment, getClabeInfo } from '@/lib/pos'
+import { getAvailabilityForDays, createAppointment, getClabeInfo, createPreventaPaquete } from '@/lib/pos'
 import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hubspot'
 
 // Aliases comunes para detectar sucursal desde texto libre del usuario
@@ -19,6 +19,11 @@ var BRANCH_ALIASES = {
   'estado de mexico': 'Metepec',
   'edomex': 'Metepec',
   'toluca': 'Metepec',
+}
+
+function isPreventaPeriod() {
+  var now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
+  return now.getFullYear() === 2026 && now.getMonth() === 4 && now.getDate() >= 4 && now.getDate() <= 14
 }
 
 function detectBranchByName(text, branches) {
@@ -83,7 +88,10 @@ export async function POST(request) {
         : { data: null }
 
       if (leadForImg.data?.stage === 'anticipo_pendiente') {
-        // Marcar pending_appointment como comprobante_recibido
+        // Buscar el pending_appointment para saber si es preventa
+        var pendingForImg = await supabaseImg.from('pending_appointments')
+          .select('*').eq('lead_id', leadForImg.data.id).eq('status', 'pendiente').single()
+
         await supabaseImg.from('pending_appointments')
           .update({ status: 'comprobante_recibido' })
           .eq('lead_id', leadForImg.data.id)
@@ -101,11 +109,38 @@ export async function POST(request) {
           })
         }
 
-        // Escalar para revisión manual
-        await supabaseImg.from('conversations').update({ status: 'escalada', escalated_at: new Date().toISOString() }).eq('id', convForImg.data?.id)
-        await supabaseImg.from('leads').update({ stage: 'escalado', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
+        var compReply
+        // Si es preventa: crear paquete+cita directamente al recibir comprobante
+        if (pendingForImg.data?.es_preventa && pendingForImg.data?.precio_total) {
+          var pd = pendingForImg.data
+          var preventaResult = await createPreventaPaquete({
+            sucursal: pd.sucursal,
+            fecha: pd.fecha,
+            hora: pd.hora,
+            servicio: pd.servicio,
+            nombre: pd.nombre,
+            telefono: pd.phone,
+            precio_total: pd.precio_total,
+            monto_inicial: pd.monto_anticipo,
+          })
+          if (preventaResult.success) {
+            await supabaseImg.from('leads').update({ stage: 'cita_agendada', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
+            var mitad = pd.monto_anticipo
+            var pendienteMonto = pd.precio_total - mitad
+            compReply = '¡Tu lugar está apartado hermosa! 🎉 Tu cita queda confirmada para el ' + pd.fecha + ' a las ' + pd.hora + ' en ' + pd.sucursal + ' ✨\n\nRecuerda que el saldo pendiente de $' + pendienteMonto + ' lo liquidas del 15 al 30 de mayo 💖'
+          } else {
+            console.error('Error creando preventa desde comprobante:', preventaResult.error)
+            await supabaseImg.from('leads').update({ stage: 'escalado', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
+            await supabaseImg.from('conversations').update({ status: 'escalada', escalated_at: new Date().toISOString() }).eq('id', convForImg.data?.id)
+            compReply = '¡Recibimos tu comprobante! ✨ En breve una asesora te confirma tu lugar 💖'
+          }
+        } else {
+          // Flujo regular: escalar para verificación manual
+          await supabaseImg.from('conversations').update({ status: 'escalada', escalated_at: new Date().toISOString() }).eq('id', convForImg.data?.id)
+          await supabaseImg.from('leads').update({ stage: 'escalado', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
+          compReply = '¡Recibimos tu comprobante! ✨ En breve una de nuestras asesoras lo verifica y te confirma tu cita 💖 Gracias por tu paciencia hermosa.'
+        }
 
-        var compReply = '¡Recibimos tu comprobante! ✨ En breve una de nuestras asesoras lo verifica y te confirma tu cita 💖 Gracias por tu paciencia hermosa.'
         if (convForImg.data) {
           await supabaseImg.from('messages').insert({ conversation_id: convForImg.data.id, business_id: bizForImg.data.id, role: 'bot', content: compReply })
         }
@@ -331,13 +366,23 @@ export async function POST(request) {
         availabilityInfo += '\n\nINSTRUCCIONES DE AGENDAMIENTO:'
         availabilityInfo += '\n- Ofrece 2-3 horarios específicos del día que pida el prospecto.'
         availabilityInfo += '\n- CRÍTICO: Usa ÚNICAMENTE las fechas en formato YYYY-MM-DD que aparecen en la lista de arriba. CÓPIALAS exactamente, no las reformatees ni calcules fechas tú mismo.'
-        availabilityInfo += '\n- Cuando confirme horario, incluye en tu respuesta el tag:'
-        availabilityInfo += '\n  [SOLICITAR_ANTICIPO|fecha|hora|servicio|nombre]'
-        availabilityInfo += '\n  Ejemplo: [SOLICITAR_ANTICIPO|' + exampleDate + '|11:00|Combo Axilas|María López]'
-        availabilityInfo += '\n- La fecha DEBE ser copiada tal cual de la lista (YYYY-MM-DD). La hora DEBE ser formato HH:MM.'
-        availabilityInfo += '\n- El servicio debe ser el que el prospecto eligió en la conversación.'
-        availabilityInfo += '\n- Después del tag escribe: "Para apartar tu lugar te pido un anticipo de $200 que se descuenta el día de tu sesión ✨ Ahora te comparto los datos para la transferencia 💖 Una vez que la realices, mándanos tu comprobante y confirmamos tu cita."'
-        availabilityInfo += '\n- CRÍTICO: La cita queda confirmada HASTA que recibamos el comprobante. NUNCA digas "tu cita está confirmada" antes de eso.'
+        if (isPreventaPeriod()) {
+          availabilityInfo += '\n- ESTAMOS EN PREVENTA HOT SALE (4–14 mayo). Cuando confirme horario, usa el tag:'
+          availabilityInfo += '\n  [SOLICITAR_PREVENTA|fecha|hora|servicio|nombre|precio_total]'
+          availabilityInfo += '\n  Ejemplo: [SOLICITAR_PREVENTA|' + exampleDate + '|11:00|Full Body|María López|8500]'
+          availabilityInfo += '\n- precio_total es el precio Hot Sale del servicio elegido (el total completo, no la mitad).'
+          availabilityInfo += '\n- La fecha DEBE ser copiada tal cual de la lista (YYYY-MM-DD). La hora DEBE ser formato HH:MM.'
+          availabilityInfo += '\n- Después del tag escribe: "Para apartar tu lugar de la Preventa Hot Sale 🔥 te pido el 50% ahora: $[precio/2] ✨ La otra mitad la liquidas del 15 al 30 de mayo. Ahora te comparto los datos para la transferencia 💖 Una vez que la realices, mándanos tu comprobante y confirmamos tu lugar."'
+          availabilityInfo += '\n- CRÍTICO: El lugar queda confirmado HASTA que recibamos el comprobante. NUNCA digas "tu cita está confirmada" antes de eso.'
+        } else {
+          availabilityInfo += '\n- Cuando confirme horario, incluye en tu respuesta el tag:'
+          availabilityInfo += '\n  [SOLICITAR_ANTICIPO|fecha|hora|servicio|nombre]'
+          availabilityInfo += '\n  Ejemplo: [SOLICITAR_ANTICIPO|' + exampleDate + '|11:00|Combo Axilas|María López]'
+          availabilityInfo += '\n- La fecha DEBE ser copiada tal cual de la lista (YYYY-MM-DD). La hora DEBE ser formato HH:MM.'
+          availabilityInfo += '\n- El servicio debe ser el que el prospecto eligió en la conversación.'
+          availabilityInfo += '\n- Después del tag escribe: "Para apartar tu lugar te pido un anticipo de $200 que se descuenta el día de tu sesión ✨ Ahora te comparto los datos para la transferencia 💖 Una vez que la realices, mándanos tu comprobante y confirmamos tu cita."'
+          availabilityInfo += '\n- CRÍTICO: La cita queda confirmada HASTA que recibamos el comprobante. NUNCA digas "tu cita está confirmada" antes de eso.'
+        }
         availabilityInfo += '\n- NO preguntes si es valoración o tratamiento. Asume primera sesión del servicio que eligió.'
         availabilityInfo += '\n- Si no tienes el nombre del prospecto, PÍDELO antes de agendar.'
 
@@ -405,6 +450,45 @@ export async function POST(request) {
         // Se envía después del mensaje principal
         setTimeout(async function() {
           await sendWhatsAppMessage(phoneNumber, clabeMsg)
+        }, 1500)
+      }
+    }
+
+    // 8a2. Detectar solicitud de preventa Hot Sale
+    var preventaMatch = botReply.match(/\[SOLICITAR_PREVENTA\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
+    if (preventaMatch) {
+      var precioTotal = parseInt(preventaMatch[5].trim()) || 0
+      var montoInicial = Math.round(precioTotal / 2)
+      var pendingPreventaData = {
+        lead_id: lead.id,
+        phone: phoneNumber,
+        nombre: preventaMatch[4].trim(),
+        servicio: preventaMatch[3].trim(),
+        fecha: preventaMatch[1].trim(),
+        hora: preventaMatch[2].trim(),
+        sucursal: activeBranch?.name || null,
+        precio_total: precioTotal,
+        monto_anticipo: montoInicial,
+        es_preventa: true,
+        status: 'pendiente',
+      }
+
+      await supabase.from('pending_appointments').insert(pendingPreventaData)
+      await supabase.from('leads').update({ stage: 'anticipo_pendiente', updated_at: new Date().toISOString() }).eq('id', lead.id)
+
+      botReply = botReply.replace(/\[SOLICITAR_PREVENTA\|[^\]]+\]/g, '').trim()
+
+      // Enviar datos bancarios con el monto del 50%
+      var clabePreventa = getClabeInfo(activeBranch?.name)
+      if (clabePreventa) {
+        var clabeMsgPreventa = '💳 *Datos para transferencia — CIRE ' + activeBranch.name + '*\n\n'
+          + '🏦 Banco: ' + clabePreventa.banco + '\n'
+          + '🔢 CLABE: ' + clabePreventa.clabe + '\n'
+          + '👤 Titular: ' + clabePreventa.titular + '\n'
+          + '💰 Monto (50%): $' + montoInicial + '\n\n'
+          + 'Una vez realizada, envíanos la foto de tu comprobante aquí mismo ✨'
+        setTimeout(async function() {
+          await sendWhatsAppMessage(phoneNumber, clabeMsgPreventa)
         }, 1500)
       }
     }
