@@ -5,17 +5,29 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-export async function generateBotResponse(_systemPrompt, messageHistory, leadInfo, branchConfig) {
+export async function generateBotResponse(_systemPrompt, messageHistory, leadInfo, branchConfig, availabilityInfo, allBranches) {
   const branchInfo = leadInfo.metadata?.sucursal
     ? `\nSUCURSAL DEL LEAD: ${leadInfo.metadata.sucursal}${leadInfo.metadata.direccion ? ` (${leadInfo.metadata.direccion})` : ''}${leadInfo.metadata.zona ? ` - Zona: ${leadInfo.metadata.zona}` : ''}`
     : ''
 
+  // Lista de sucursales para el system prompt (siempre disponible para contexto)
+  const branchesList = allBranches?.length
+    ? '\nSUCURSALES DISPONIBLES: ' + allBranches.map(b => b.name + (b.address ? ` (${b.address})` : '')).join(' | ')
+    : ''
+
   const fullSystemPrompt = `${SYSTEM_PROMPT}
-${branchInfo}
+${branchInfo}${branchesList}
 INFORMACIÓN DEL PROSPECTO:
 - Nombre: ${leadInfo.name || 'No proporcionado aún'}
+- Teléfono WhatsApp: ${leadInfo.phone} (ya lo tienes, NO se lo pidas al cliente)
 - Etapa: ${leadInfo.stage || 'nuevo'}
-- Datos recopilados: ${JSON.stringify(leadInfo.metadata || {})}`
+- Datos recopilados: ${JSON.stringify(leadInfo.metadata || {})}
+
+REGLAS DE DATOS AL AGENDAR:
+- El teléfono ya está capturado de WhatsApp, NUNCA se lo pidas al cliente.
+- El nombre solo pídelo si no aparece arriba. Úsalo para personalizar la cita, no para "buscar en el sistema".
+- Todos los leads son nuevos clientes, no busques historial en ningún sistema.
+${availabilityInfo || ''}`
 
   const messages = messageHistory.map((msg) => ({
     role: msg.role === 'lead' ? 'user' : 'assistant',
@@ -23,16 +35,21 @@ INFORMACIÓN DEL PROSPECTO:
   }))
 
   if (messages.length === 0 || messages[0].role !== 'user') {
-    return {
-      text: `¡Hola${leadInfo.name ? ` ${leadInfo.name}` : ''}! 👋 Bienvenid@ a CIRE${leadInfo.metadata?.sucursal ? ` ${leadInfo.metadata.sucursal}` : ''}. Soy la asistente virtual de CIRE. ¿Cómo te llamas? Y platícame, ¿qué servicio te interesa?`,
-      shouldEscalate: false,
-    }
+    const sucursal = leadInfo.metadata?.sucursal
+    const greeting = sucursal
+      ? `¡Hola${leadInfo.name ? ` ${leadInfo.name}` : ''}! ✨ Soy la asistente de CIRE ${sucursal} 💖 Llevamos 9 años siendo pioneras en depilación láser, faciales y tratamientos corporales ✨ Cuéntame, ¿qué te gustaría mejorar?`
+      : `¡Hola${leadInfo.name ? ` ${leadInfo.name}` : ''}! ✨ Soy la asistente de CIRE 💖 Somos especialistas en depilación láser, faciales clínicos y tratamientos corporales — 9 años de experiencia, 5 sucursales ✨ Cuéntame, ¿qué te gustaría mejorar?`
+    return { text: greeting, shouldEscalate: false }
   }
+
+  const botMessageCount = messageHistory.filter((msg) => msg.role !== 'lead').length
+  const hasAvailability = !!availabilityInfo
+  const model = (botMessageCount < 3 && !hasAvailability) ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6'
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
+      model,
+      max_tokens: 600,
       system: [
         {
           type: 'text',

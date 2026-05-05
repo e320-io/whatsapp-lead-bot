@@ -115,9 +115,9 @@ export async function getAvailabilityForDays(sucursalNombre, numDays) {
       var manana = slots.filter(function (s) { return parseInt(s.split(':')[0]) < 14 })
       var tarde = slots.filter(function (s) { return parseInt(s.split(':')[0]) >= 14 })
       var summary = ''
-      if (manana.length > 0) summary += 'Mañana: ' + manana[0] + '-' + manana[manana.length - 1]
+      if (manana.length > 0) summary += 'Mañana: ' + manana.join(', ')
       if (manana.length > 0 && tarde.length > 0) summary += ' | '
-      if (tarde.length > 0) summary += 'Tarde: ' + tarde[0] + '-' + tarde[tarde.length - 1]
+      if (tarde.length > 0) summary += 'Tarde: ' + tarde.join(', ')
       results.push(dayName + ' ' + dateStr + ': ' + summary)
     } else {
       results.push(dayName + ' ' + dateStr + ': SIN DISPONIBILIDAD')
@@ -127,10 +127,99 @@ export async function getAvailabilityForDays(sucursalNombre, numDays) {
   return results.join('\n')
 }
 
+var CLABE_POR_SUCURSAL = {
+  'Polanco': { banco: 'BBVA', clabe: '012180001234567890', titular: 'CIRE Polanco SA de CV' },
+  'Valle':   { banco: 'HSBC', clabe: '021180002345678901', titular: 'CIRE Del Valle SA de CV' },
+  'Coapa':   { banco: 'Santander', clabe: '014180003456789012', titular: 'CIRE Coapa SA de CV' },
+  'Oriente': { banco: 'Banorte', clabe: '006180004567890123', titular: 'CIRE Oriente SA de CV' },
+  'Metepec': { banco: 'Banamex', clabe: '002180005678901234', titular: 'CIRE Metepec SA de CV' },
+}
+
+export function getClabeInfo(sucursalNombre) {
+  return CLABE_POR_SUCURSAL[sucursalNombre] || null
+}
+
+export async function createAppointmentWithAnticipo(data) {
+  var sucursalId = SUCURSALES[data.sucursal]
+  if (!sucursalId) return { success: false, error: 'Sucursal no encontrada' }
+
+  var dateRegex = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRegex.test(data.fecha)) return { success: false, error: 'Formato de fecha inválido: ' + data.fecha }
+
+  var duracion = getDuracion(data.servicio)
+  var tipoServicio = getTipoServicio(data.servicio)
+
+  var startParts = data.hora.split(':')
+  var startH = parseInt(startParts[0])
+  var startM = parseInt(startParts[1])
+  var endMinutes = startH * 60 + startM + duracion
+  var endH = Math.floor(endMinutes / 60)
+  var endM = endMinutes % 60
+  var horaFin = String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0')
+
+  var slots = await getAvailableSlots(data.sucursal, data.fecha)
+  if (!slots.includes(data.hora)) return { success: false, error: 'Ese horario ya no está disponible' }
+
+  var insertData = {
+    clienta_nombre: data.nombre || 'Lead WhatsApp',
+    sucursal_id: sucursalId,
+    sucursal_nombre: data.sucursal,
+    servicio: data.servicio || 'Primera sesión depilación láser',
+    tipo_servicio: tipoServicio,
+    duracion_min: duracion,
+    fecha: data.fecha,
+    hora_inicio: data.hora,
+    hora_fin: horaFin,
+    sesion_numero: 1,
+    es_cobro: false,
+    estado: 'agendada',
+    anticipo_metodo: 'Anticipo Transferencia',
+    anticipo_monto: 200,
+    notas: 'Anticipo $200 Transferencia · Pago online · Tel: ' + (data.telefono || 'N/A'),
+  }
+
+  console.log('Insertando cita con anticipo en POS:', JSON.stringify(insertData))
+
+  var result = await posSupabase.from('citas').insert(insertData).select().single()
+
+  if (result.error) {
+    console.error('Error creando cita con anticipo en POS:', JSON.stringify(result.error))
+    return { success: false, error: result.error.message }
+  }
+
+  // Crear ticket de anticipo (best-effort, no bloquea si falla)
+  try {
+    await posSupabase.from('tickets').insert({
+      sucursal_id: sucursalId,
+      sucursal_nombre: data.sucursal,
+      servicios: [data.servicio || 'Primera sesión depilación láser'],
+      total: 200,
+      metodo_pago: 'Anticipo Transferencia',
+      tipo_clienta: 'Nueva',
+    })
+  } catch (ticketErr) {
+    console.error('No se pudo crear ticket de anticipo (no crítico):', ticketErr)
+  }
+
+  console.log('Cita con anticipo creada exitosamente:', result.data.id)
+  return { success: true, cita: result.data }
+}
+
 export async function createAppointment(data) {
   var sucursalId = SUCURSALES[data.sucursal]
   if (!sucursalId) {
     return { success: false, error: 'Sucursal no encontrada' }
+  }
+
+  var dateRegex = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRegex.test(data.fecha)) {
+    return { success: false, error: 'Formato de fecha inválido, debe ser YYYY-MM-DD: ' + data.fecha }
+  }
+  var appointmentDate = new Date(data.fecha + 'T12:00:00')
+  var todayMx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
+  todayMx.setHours(0, 0, 0, 0)
+  if (appointmentDate < todayMx) {
+    return { success: false, error: 'No se puede agendar en fecha pasada: ' + data.fecha }
   }
 
   var duracion = getDuracion(data.servicio)

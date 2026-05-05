@@ -10,7 +10,7 @@ export async function GET(request, { params }) {
     // Traer todas las conversaciones del lead
     const { data: conversations, error: convError } = await supabase
       .from('conversations')
-      .select('id, status, created_at')
+      .select('id, status, created_at, bot_paused')
       .eq('lead_id', leadId)
       .order('created_at', { ascending: true })
 
@@ -23,7 +23,7 @@ export async function GET(request, { params }) {
     // Traer todos los mensajes de esas conversaciones
     const { data: messages, error: msgError } = await supabase
       .from('messages')
-      .select('id, conversation_id, role, content, created_at')
+      .select('id, conversation_id, role, content, created_at, is_human_agent')
       .in('conversation_id', convIds)
       .order('created_at', { ascending: true })
 

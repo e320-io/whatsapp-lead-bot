@@ -2,8 +2,41 @@ import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
 import { sendWhatsAppMessage, markAsRead } from '@/lib/whatsapp'
 import { generateBotResponse } from '@/lib/claude'
-import { getAvailabilityForDays, createAppointment } from '@/lib/pos'
+import { getAvailabilityForDays, createAppointment, getClabeInfo } from '@/lib/pos'
 import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hubspot'
+
+// Aliases comunes para detectar sucursal desde texto libre del usuario
+var BRANCH_ALIASES = {
+  'polanco': 'Polanco',
+  'del valle': 'Valle',
+  'galerias insurgentes': 'Valle',
+  'insurgentes': 'Valle',
+  'coapa': 'Coapa',
+  'galerias coapa': 'Coapa',
+  'oriente': 'Oriente',
+  'plaza oriente': 'Oriente',
+  'metepec': 'Metepec',
+  'estado de mexico': 'Metepec',
+  'edomex': 'Metepec',
+  'toluca': 'Metepec',
+}
+
+function detectBranchByName(text, branches) {
+  if (!text || !branches?.length) return null
+  var normalized = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  for (var alias of Object.keys(BRANCH_ALIASES)) {
+    if (normalized.includes(alias)) {
+      var targetName = BRANCH_ALIASES[alias]
+      return branches.find(function (b) { return b.name === targetName }) || null
+    }
+  }
+  // Fallback: comparar directamente contra nombres de sucursales en BD
+  for (var branch of branches) {
+    var branchNorm = branch.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    if (normalized.includes(branchNorm)) return branch
+  }
+  return null
+}
 
 export async function GET(request) {
   var url = new URL(request.url)
@@ -37,6 +70,53 @@ export async function POST(request) {
     var messageText = message.text?.body || ''
     var businessPhoneId = value.metadata?.phone_number_id || null
 
+    // Manejar imagen/documento de comprobante para leads en anticipo_pendiente
+    if (message.type === 'image' || message.type === 'document') {
+      var supabaseImg = createSupabaseAdmin()
+      var dedupImg = await supabaseImg.from('messages').select('id').eq('whatsapp_message_id', message.id).limit(1)
+      if (dedupImg.data?.length > 0) return NextResponse.json({ status: 'duplicate' })
+
+      // Buscar lead
+      var bizForImg = await supabaseImg.from('businesses').select('*').limit(1).single()
+      var leadForImg = bizForImg.data
+        ? await supabaseImg.from('leads').select('*').eq('business_id', bizForImg.data.id).eq('phone', phoneNumber).single()
+        : { data: null }
+
+      if (leadForImg.data?.stage === 'anticipo_pendiente') {
+        // Marcar pending_appointment como comprobante_recibido
+        await supabaseImg.from('pending_appointments')
+          .update({ status: 'comprobante_recibido' })
+          .eq('lead_id', leadForImg.data.id)
+          .eq('status', 'pendiente')
+
+        // Guardar mensaje de comprobante
+        var convForImg = await supabaseImg.from('conversations').select('id').eq('lead_id', leadForImg.data.id).eq('status', 'activa').order('created_at', { ascending: false }).limit(1).single()
+        if (convForImg.data) {
+          await supabaseImg.from('messages').insert({
+            conversation_id: convForImg.data.id,
+            business_id: bizForImg.data.id,
+            role: 'lead',
+            content: '[Comprobante de transferencia recibido]',
+            whatsapp_message_id: message.id,
+          })
+        }
+
+        // Escalar para revisión manual
+        await supabaseImg.from('conversations').update({ status: 'escalada', escalated_at: new Date().toISOString() }).eq('id', convForImg.data?.id)
+        await supabaseImg.from('leads').update({ stage: 'escalado', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
+
+        var compReply = '¡Recibimos tu comprobante! ✨ En breve una de nuestras asesoras lo verifica y te confirma tu cita 💖 Gracias por tu paciencia hermosa.'
+        if (convForImg.data) {
+          await supabaseImg.from('messages').insert({ conversation_id: convForImg.data.id, business_id: bizForImg.data.id, role: 'bot', content: compReply })
+        }
+        await sendWhatsAppMessage(phoneNumber, compReply)
+        return NextResponse.json({ status: 'comprobante_recibido' })
+      }
+
+      await sendWhatsAppMessage(phoneNumber, 'Por el momento solo puedo leer mensajes de texto. ¿Podrías escribirme tu consulta? 😊')
+      return NextResponse.json({ status: 'non_text_handled' })
+    }
+
     if (message.type !== 'text') {
       await sendWhatsAppMessage(phoneNumber, 'Por el momento solo puedo leer mensajes de texto. ¿Podrías escribirme tu consulta? 😊')
       return NextResponse.json({ status: 'non_text_handled' })
@@ -63,15 +143,50 @@ export async function POST(request) {
       .from('branches').select('*, businesses(*)').eq('whatsapp_number', businessPhoneId).eq('is_active', true).single()
 
     var business = branchResult.data?.businesses
-    var activeBranch = branchResult.data
+    // El match por número solo identifica el negocio, no confirma sucursal para el lead.
+    // La sucursal debe ser elegida explícitamente (keyword, nombre en mensaje, o elección guardada).
+    var activeBranch = null
+    var branchConfirmed = false
 
     if (!business) {
       var bizResult = await supabase.from('businesses').select('*').limit(1).single()
       business = bizResult.data
       if (!business) return NextResponse.json({ error: 'No business' }, { status: 500 })
+      // En modo centralizado el fallback NO confirma sucursal — Claude debe preguntarla
+      activeBranch = null
+      branchConfirmed = false
+    }
 
-      var brFallback = await supabase.from('branches').select('*').eq('business_id', business.id).eq('is_active', true).limit(1).single()
-      activeBranch = brFallback.data
+    // 1b. Detectar sucursal por keyword o por nombre en el mensaje
+    var cleanedMessageText = messageText
+    var keywordBranchDetected = false
+    var lowerMsgForKeyword = messageText.toLowerCase().trim()
+    var allBranchesResult = await supabase
+      .from('branches').select('*').eq('business_id', business.id).eq('is_active', true)
+    var allBranches = allBranchesResult.data || []
+
+    // Primero intentar por keyword de campaña (mensaje prellenado de Meta Ads)
+    for (var kb of allBranches) {
+      if (kb.keyword && lowerMsgForKeyword.includes(kb.keyword.toLowerCase())) {
+        activeBranch = kb
+        keywordBranchDetected = true
+        branchConfirmed = true
+        cleanedMessageText = messageText.replace(new RegExp(kb.keyword, 'gi'), '').trim()
+        if (!cleanedMessageText) cleanedMessageText = ''
+        console.log('Sucursal detectada por keyword:', kb.name, '| Mensaje limpio:', cleanedMessageText || '(vacío)')
+        break
+      }
+    }
+
+    // Si no hay keyword, intentar detectar por nombre de sucursal en el texto
+    if (!keywordBranchDetected) {
+      var detectedByName = detectBranchByName(messageText, allBranches)
+      if (detectedByName) {
+        activeBranch = detectedByName
+        keywordBranchDetected = true
+        branchConfirmed = true
+        console.log('Sucursal detectada por nombre en mensaje:', detectedByName.name)
+      }
     }
 
     // 2. Buscar o crear lead
@@ -85,9 +200,43 @@ export async function POST(request) {
       }).select().single()
       if (newLeadResult.error) return NextResponse.json({ error: 'Error creating lead' }, { status: 500 })
       lead = newLeadResult.data
-    } else if (contactName && !lead.name) {
-      await supabase.from('leads').update({ name: contactName }).eq('id', lead.id)
-      lead.name = contactName
+    } else {
+      // El lead respondió: actualizar nombre si faltaba y resetear contadores de seguimiento
+      var hadFollowUps = lead.metadata?.follow_up_count > 0
+      var stageReset = lead.stage === 'escalado' ? { stage: 'en_conversacion' } : {}
+      var leadUpdates = {
+        ...stageReset,
+        metadata: Object.assign({}, lead.metadata || {}, {
+          follow_up_count: 0,
+          last_follow_up_at: null,
+          follow_up_type: null,
+        }),
+      }
+      if (contactName && !lead.name) leadUpdates.name = contactName
+      // Si se detectó una keyword, persistir la sucursal en el lead
+      if (keywordBranchDetected && activeBranch?.id && lead.branch_id !== activeBranch.id) {
+        leadUpdates.branch_id = activeBranch.id
+        console.log('Actualizando branch_id del lead a:', activeBranch.name)
+      }
+      await supabase.from('leads').update(leadUpdates).eq('id', lead.id)
+      if (stageReset.stage) lead.stage = stageReset.stage
+      if (contactName && !lead.name) lead.name = contactName
+      if (leadUpdates.branch_id) lead.branch_id = leadUpdates.branch_id
+      if (hadFollowUps) lead.metadata = Object.assign({}, lead.metadata, { follow_up_count: 0, last_follow_up_at: null })
+    }
+
+    // Si no se detectó por texto pero el lead ya eligió sucursal antes → usarla (confirmada)
+    if (!keywordBranchDetected && lead.branch_id) {
+      var savedBranchResult = await supabase.from('branches').select('*').eq('id', lead.branch_id).single()
+      if (savedBranchResult.data) {
+        activeBranch = savedBranchResult.data
+        branchConfirmed = true
+        console.log('Sucursal recuperada del lead:', activeBranch.name)
+      }
+    }
+
+    if (!branchConfirmed) {
+      console.log('Sucursal no confirmada — Claude preguntará antes de agendar')
     }
 
     // Sincronizar con HubSpot (no bloquea el flujo si falla)
@@ -129,22 +278,42 @@ export async function POST(request) {
       conversation = newConvResult.data
     }
 
-    // 4. Guardar mensaje
+    // 4. Guardar mensaje (sin la keyword de sucursal si fue detectada)
+    var savedMessageContent = cleanedMessageText || messageText
     await supabase.from('messages').insert({
-      conversation_id: conversation.id, business_id: business.id, role: 'lead', content: messageText,
+      conversation_id: conversation.id, business_id: business.id, role: 'lead', content: savedMessageContent,
       whatsapp_message_id: message.id
     })
+
+    // Si una recepcionista tomó el control, guardar mensaje y no responder con bot
+    if (conversation.bot_paused) {
+      console.log('Bot pausado para lead', lead.phone, '- mensaje guardado, recepcionista atiende')
+      return NextResponse.json({ status: 'bot_paused' })
+    }
 
     // 5. Cargar historial
     var historyResult = await supabase.from('messages').select('role, content').eq('conversation_id', conversation.id).order('created_at', { ascending: true }).limit(20)
     var history = historyResult.data || []
 
     // 6. Consultar disponibilidad si quiere agendar
-    var lowerMsg = messageText.toLowerCase()
+    var lowerMsg = savedMessageContent.toLowerCase()
     var bookingWords = ['agendar', 'cita', 'horario', 'disponibilidad', 'día', 'mañana', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'agenda', 'cuando', 'cuándo', 'puedo ir', 'hay lugar', 'tienen espacio', 'quiero ir', 'sesión', 'sesion']
     var wantsToBook = bookingWords.some(function (kw) { return lowerMsg.includes(kw) })
 
+    // Si el mensaje es corto (confirmación como "sip", "ok", "dale"), revisar si el historial reciente tiene contexto de agendamiento
+    if (!wantsToBook && savedMessageContent.length < 30) {
+      var recentBotMessages = history.filter(function (m) { return m.role === 'bot' }).slice(-3)
+      var botBookingContext = recentBotMessages.some(function (m) {
+        var c = (m.content || '').toLowerCase()
+        return bookingWords.some(function (kw) { return c.includes(kw) }) || c.includes('horario') || c.includes('disponib')
+      })
+      if (botBookingContext) wantsToBook = true
+    }
+
     var availabilityInfo = ''
+    if (wantsToBook && !activeBranch) {
+      availabilityInfo = '\n\nATENCIÓN — SUCURSAL NO CONFIRMADA: El lead quiere agendar pero aún NO ha elegido sucursal. DEBES preguntar cuál sucursal le queda más cerca ANTES de ofrecer cualquier horario. Usa exactamente: "¡Perfecto! 💖 Llevamos 9 años siendo pioneras en depilación láser con 5 sucursales en CDMX y Metepec ✨ Tenemos en: Polanco, Del Valle, Coapa, Oriente y Metepec 🙌 ¿Cuál te queda más cerca?" — NUNCA inventes horarios ni menciones una sucursal específica sin que el lead la haya elegido.'
+    }
     if (wantsToBook && activeBranch?.name) {
       try {
         var avail = await getAvailabilityForDays(activeBranch.name, 14)
@@ -155,18 +324,20 @@ export async function POST(request) {
         var todayStr = todayMx.getFullYear() + '-' + String(todayMx.getMonth() + 1).padStart(2, '0') + '-' + String(todayMx.getDate()).padStart(2, '0')
         var todayNatural = dias[todayMx.getDay()] + ' ' + todayMx.getDate() + ' de ' + meses[todayMx.getMonth()] + ' de ' + todayMx.getFullYear()
 
+        var firstAvailDate = avail.match(/\d{4}-\d{2}-\d{2}/)
+        var exampleDate = firstAvailDate ? firstAvailDate[0] : todayStr
         availabilityInfo = '\n\nFECHA DE HOY: ' + todayStr + ' (' + todayNatural + ')'
-        availabilityInfo += '\nIMPORTANTE: Estamos en MARZO 2026. Cuando digas fechas, usa el mes correcto (marzo). "Mañana" es ' + dias[(todayMx.getDay() + 1) % 7] + ' ' + (todayMx.getDate() + 1) + ' de marzo.'
         availabilityInfo += '\nDISPONIBILIDAD REAL DE AGENDA (' + activeBranch.name + ') - próximos 14 días:\n' + avail
         availabilityInfo += '\n\nINSTRUCCIONES DE AGENDAMIENTO:'
         availabilityInfo += '\n- Ofrece 2-3 horarios específicos del día que pida el prospecto.'
-        availabilityInfo += '\n- Usa SOLO las fechas que aparecen arriba. NUNCA inventes una fecha.'
-        availabilityInfo += '\n- Cuando confirme horario, responde con este formato en tu mensaje:'
-        availabilityInfo += '\n  [CREAR_CITA|fecha|hora|servicio|nombre]'
-        availabilityInfo += '\n  Ejemplo: [CREAR_CITA|2026-03-25|11:00|Combo Axilas|María López]'
-        availabilityInfo += '\n- La fecha DEBE ser formato YYYY-MM-DD. La hora DEBE ser formato HH:MM.'
+        availabilityInfo += '\n- CRÍTICO: Usa ÚNICAMENTE las fechas en formato YYYY-MM-DD que aparecen en la lista de arriba. CÓPIALAS exactamente, no las reformatees ni calcules fechas tú mismo.'
+        availabilityInfo += '\n- Cuando confirme horario, incluye en tu respuesta el tag:'
+        availabilityInfo += '\n  [SOLICITAR_ANTICIPO|fecha|hora|servicio|nombre]'
+        availabilityInfo += '\n  Ejemplo: [SOLICITAR_ANTICIPO|' + exampleDate + '|11:00|Combo Axilas|María López]'
+        availabilityInfo += '\n- La fecha DEBE ser copiada tal cual de la lista (YYYY-MM-DD). La hora DEBE ser formato HH:MM.'
         availabilityInfo += '\n- El servicio debe ser el que el prospecto eligió en la conversación.'
-        availabilityInfo += '\n- Además del código, escribe un mensaje bonito confirmando la cita.'
+        availabilityInfo += '\n- Después del tag escribe: "Para apartar tu lugar te pido un anticipo de $200 que se descuenta el día de tu sesión ✨ Ahora te comparto los datos para la transferencia 💖 Una vez que la realices, mándanos tu comprobante y confirmamos tu cita."'
+        availabilityInfo += '\n- CRÍTICO: La cita queda confirmada HASTA que recibamos el comprobante. NUNCA digas "tu cita está confirmada" antes de eso.'
         availabilityInfo += '\n- NO preguntes si es valoración o tratamiento. Asume primera sesión del servicio que eligió.'
         availabilityInfo += '\n- Si no tienes el nombre del prospecto, PÍDELO antes de agendar.'
 
@@ -178,19 +349,67 @@ export async function POST(request) {
 
     // 7. Generar respuesta con Claude
     var branchConfig = activeBranch?.config || business.config || {}
-    var branchInfo = activeBranch ? { sucursal: activeBranch.name, direccion: activeBranch.address, zona: activeBranch.zone } : {}
+    // Solo pasar sucursal a Claude si fue confirmada explícitamente (no fallback)
+    var branchInfo = (activeBranch && branchConfirmed)
+      ? { sucursal: activeBranch.name, direccion: activeBranch.address, zona: activeBranch.zone }
+      : {}
+
+    // Si el mensaje es solo una keyword de Meta Ads (vacío después de limpiar) Y es conversación nueva → trigger de saludo
+    // Si hay historial previo, el lead está eligiendo sucursal en conversación — NO reiniciar
+    var effectiveHistory = history
+    if (keywordBranchDetected && !cleanedMessageText && history.length <= 1) {
+      effectiveHistory = [{ role: 'lead', content: 'Hola' }]
+    }
 
     var botResult = await generateBotResponse(
-      business.system_prompt + availabilityInfo,
-      history,
-      { name: lead.name, stage: lead.stage, metadata: Object.assign({}, lead.metadata || {}, branchInfo) },
-      branchConfig
+      business.system_prompt,
+      effectiveHistory,
+      { name: lead.name, phone: lead.phone, stage: lead.stage, metadata: Object.assign({}, lead.metadata || {}, branchInfo) },
+      branchConfig,
+      availabilityInfo,
+      allBranches
     )
 
     var botReply = botResult.text
     var shouldEscalate = botResult.shouldEscalate
 
-    // 8. Detectar y ejecutar creación de cita
+    // 8a. Detectar solicitud de anticipo
+    var anticipoMatch = botReply.match(/\[SOLICITAR_ANTICIPO\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
+    if (anticipoMatch) {
+      var pendingData = {
+        lead_id: lead.id,
+        phone: phoneNumber,
+        nombre: anticipoMatch[4].trim(),
+        servicio: anticipoMatch[3].trim(),
+        fecha: anticipoMatch[1].trim(),
+        hora: anticipoMatch[2].trim(),
+        sucursal: activeBranch?.name || null,
+        monto_anticipo: 200,
+        status: 'pendiente',
+      }
+
+      await supabase.from('pending_appointments').insert(pendingData)
+      await supabase.from('leads').update({ stage: 'anticipo_pendiente', updated_at: new Date().toISOString() }).eq('id', lead.id)
+
+      botReply = botReply.replace(/\[SOLICITAR_ANTICIPO\|[^\]]+\]/g, '').trim()
+
+      // Enviar datos bancarios en mensaje separado
+      var clabeInfo = getClabeInfo(activeBranch?.name)
+      if (clabeInfo) {
+        var clabeMsg = '💳 *Datos para transferencia — CIRE ' + activeBranch.name + '*\n\n'
+          + '🏦 Banco: ' + clabeInfo.banco + '\n'
+          + '🔢 CLABE: ' + clabeInfo.clabe + '\n'
+          + '👤 Titular: ' + clabeInfo.titular + '\n'
+          + '💰 Monto: $200\n\n'
+          + 'Una vez realizada, envíanos la foto de tu comprobante aquí mismo ✨'
+        // Se envía después del mensaje principal
+        setTimeout(async function() {
+          await sendWhatsAppMessage(phoneNumber, clabeMsg)
+        }, 1500)
+      }
+    }
+
+    // 8b. Detectar y ejecutar creación de cita (flujo legacy sin anticipo)
     var citaMatch = botReply.match(/\[CREAR_CITA\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
     if (citaMatch) {
       var citaData = {
@@ -198,7 +417,7 @@ export async function POST(request) {
         hora: citaMatch[2].trim(),
         servicio: citaMatch[3].trim(),
         nombre: citaMatch[4].trim(),
-        sucursal: activeBranch?.name || 'Polanco',
+        sucursal: activeBranch?.name,
         telefono: phoneNumber
       }
 
@@ -211,8 +430,21 @@ export async function POST(request) {
         if (hubspotDealId) updateDealStage(hubspotDealId, 'cita_agendada').catch((e) => console.error('HubSpot stage update:', e.message))
       } else {
         console.error('ERROR CREANDO CITA:', citaResult.error)
-        botReply = botReply + '\n\n(Hubo un problema al agendar, una asesora te confirmará en breve)'
-        shouldEscalate = true
+        if (citaResult.error && citaResult.error.includes('no está disponible')) {
+          try {
+            var altSlots = await getAvailableSlots(citaData.sucursal, citaData.fecha)
+            if (altSlots.length > 0) {
+              botReply = 'Ese horario acaba de ser tomado 😅 Los horarios disponibles para ese día son: ' + altSlots.join(', ') + ' ¿Cuál te funciona mejor? 💖'
+            } else {
+              botReply = 'Ese horario acaba de ser tomado 😅 Ya no hay disponibilidad para ese día. ¿Te funciona otro día? 💖'
+            }
+          } catch (e) {
+            botReply = 'Ese horario acaba de ser tomado 😅 ¿Quieres que revisemos otro horario? 💖'
+          }
+        } else {
+          botReply = botReply + '\n\n(Hubo un problema al agendar, una asesora te confirmará en breve)'
+          shouldEscalate = true
+        }
       }
 
       botReply = botReply.replace(/\[CREAR_CITA\|[^\]]+\]/g, '').trim()
