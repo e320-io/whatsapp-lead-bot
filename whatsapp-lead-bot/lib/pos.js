@@ -14,10 +14,7 @@ var SUCURSALES = {
 }
 
 function getMexicoDate(daysFromNow) {
-  var now = new Date()
-  var mexicoOffset = -6 * 60
-  var utcMinutes = now.getTime() + now.getTimezoneOffset() * 60000
-  var mexicoTime = new Date(utcMinutes + mexicoOffset * 60000)
+  var mexicoTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
   if (daysFromNow) {
     mexicoTime.setDate(mexicoTime.getDate() + daysFromNow)
   }
@@ -45,6 +42,21 @@ function getTipoServicio(servicio) {
   if (s.includes('facial') || s.includes('fullface') || s.includes('limpieza')) return 'facial_full'
   if (s.includes('hifu')) return 'hifu'
   return 'laser'
+}
+
+function getSlotsForAppointment(startHora, duracion) {
+  var parts = startHora.split(':')
+  var startH = parseInt(parts[0])
+  var startM = parseInt(parts[1])
+  var slotsNeeded = Math.ceil(duracion / 30)
+  var required = []
+  for (var i = 0; i < slotsNeeded; i++) {
+    var totalMinutes = startH * 60 + startM + i * 30
+    var slotH = Math.floor(totalMinutes / 60)
+    var slotM = totalMinutes % 60
+    required.push(String(slotH).padStart(2, '0') + ':' + String(slotM).padStart(2, '0'))
+  }
+  return required
 }
 
 export async function getAvailableSlots(sucursalNombre, fecha) {
@@ -158,7 +170,8 @@ export async function createPreventaPaquete(data) {
   var horaFin = String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0')
 
   var slots = await getAvailableSlots(data.sucursal, data.fecha)
-  if (!slots.includes(data.hora)) return { success: false, error: 'Ese horario ya no está disponible' }
+  var requiredSlots = getSlotsForAppointment(data.hora, duracion)
+  if (!requiredSlots.every(function (s) { return slots.includes(s) })) return { success: false, error: 'Ese horario ya no está disponible' }
 
   var precioTotal = data.precio_total || 0
   var montoInicial = data.monto_inicial || Math.round(precioTotal / 2)
@@ -252,7 +265,8 @@ export async function createAppointmentWithAnticipo(data) {
   var horaFin = String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0')
 
   var slots = await getAvailableSlots(data.sucursal, data.fecha)
-  if (!slots.includes(data.hora)) return { success: false, error: 'Ese horario ya no está disponible' }
+  var requiredSlots = getSlotsForAppointment(data.hora, duracion)
+  if (!requiredSlots.every(function (s) { return slots.includes(s) })) return { success: false, error: 'Ese horario ya no está disponible' }
 
   var insertData = {
     clienta_nombre: data.nombre || 'Lead WhatsApp',
@@ -328,7 +342,8 @@ export async function createAppointment(data) {
   var horaFin = String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0')
 
   var slots = await getAvailableSlots(data.sucursal, data.fecha)
-  if (!slots.includes(data.hora)) {
+  var requiredSlots = getSlotsForAppointment(data.hora, duracion)
+  if (!requiredSlots.every(function (s) { return slots.includes(s) })) {
     return { success: false, error: 'Ese horario ya no está disponible' }
   }
 
