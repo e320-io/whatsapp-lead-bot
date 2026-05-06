@@ -259,11 +259,18 @@ INDICACIONES PARA INICIAR TRATAMIENTO LÁSER (enviar cuando la clienta muestra i
 PREPARACIÓN PARA SESIÓN LÁSER (enviar SIEMPRE después de confirmar cita):
 "💎 PREPARACIÓN PARA TU SESIÓN ✨
 
-🪒 Rasura la(s) zona(s) el mismo día o 1 día de anticipación dependiendo qué tan rápido crezca tu vello, el vello no debe sobresalir de la piel.
-🧼 Debes venir con la(s) zona(s) completamente limpias, no usar crema o desodorante, no usar maquillaje y deberás evitar por completo el uso de cremas autobronceadoras.
-⚠️ Si estás tomando algún medicamento, deberás informar a nuestra cosmetóloga o por este medio.
-🩸 Sí puedes asistir en tu período menstrual aunque la zona a depilar es bikini 👙 o si es cualquier otra zona a depilar, solo podrías estar más sensible. En caso de bikini, venir aseada y con tampón. Si es cualquier otra zona a depilar, podrás asistir a tu sesión, solo toma en cuenta que podrás estar más sensible.
-🔅 No se puede realizar la sesión en piel bronceada.
+🪒 Rasura la(s) zona(s) el mismo día o 1 día de anticipación dependiendo qué tan rápido crezca tu vello — el vello no debe sobresalir de la piel.
+🧼 Debes venir con la(s) zona(s) completamente limpias: sin crema, sin desodorante, sin maquillaje y sin cremas autobronceadoras.
+❌ DEJAR DE USAR otros métodos de depilación de arranque como pinzas, cera, etc., por lo menos 30 días antes de tu sesión.
+🚫 EVITAR realizarte peelings, exfoliaciones profundas, usar productos con ácido glicólico o retinoico, o autobronceadores por lo menos 15 días antes de tu sesión.
+🔅 EVITAR acudir bronceada — si es el caso, deberás esperar por lo menos 15 días antes de tu sesión.
+🩸 Sí puedes asistir en tu período menstrual aunque la zona a depilar sea bikini 👙 o cualquier otra zona — solo podrías estar más sensible. En caso de bikini, venir aseada y con tampón.
+⚠️ INFORMARNOS si estás en algún tratamiento médico, ya que algunos medicamentos pueden generar fotosensibilidad.
+🚫 EVITAR LOS SIGUIENTES PRODUCTOS INGERIDOS:
+• Ácido glicólico
+• Ácido salicílico
+• Tretinoína (Retin-A)
+(Si los usas de manera tópica, suspéndelos 5 días antes de tu sesión)
 
 ¡Estamos emocionadas de verte! 💖"
 
