@@ -48,11 +48,10 @@ ${availabilityInfo || ''}`
     return { text: greeting, shouldEscalate: false }
   }
 
-  // Usa Sonnet solo cuando hay disponibilidad de agenda o se detectan tags de acción (cita/anticipo)
+  // Usa Sonnet solo cuando se detectan tags de acción en el historial reciente
   const lastMessages = messageHistory.slice(-5).map(m => m.content || '').join(' ').toLowerCase()
   const hasActionTags = lastMessages.includes('crear_cita') || lastMessages.includes('solicitar_anticipo') || lastMessages.includes('solicitar_preventa')
-  const needsComplexReasoning = !!availabilityInfo || hasActionTags
-  const model = needsComplexReasoning ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
+  const model = hasActionTags ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
 
   try {
     const response = await anthropic.messages.create({

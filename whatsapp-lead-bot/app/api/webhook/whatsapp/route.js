@@ -2,8 +2,16 @@ import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
 import { sendWhatsAppMessage, sendWhatsAppImage, markAsRead } from '@/lib/whatsapp'
 import { generateBotResponse } from '@/lib/claude'
-import { getAvailabilityForDays, createAppointment, getClabeInfo, createPreventaPaquete } from '@/lib/pos'
+import { createAppointment, getAvailableSlots, getClabeInfo, createPreventaPaquete } from '@/lib/pos'
 import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hubspot'
+
+var BRANCH_WHATSAPP_NUMBERS = {
+  'Valle':    '5528008869',
+  'Coapa':    '5630399230',
+  'Oriente':  '5547681165',
+  'Polanco':  '5523432589',
+  'Metepec':  '7291766576',
+}
 
 var MAPS_POR_SUCURSAL = {
   'Coapa':   'https://maps.app.goo.gl/9C2enEz7xchp9xen6',
@@ -375,48 +383,33 @@ export async function POST(request) {
 
     var availabilityInfo = ''
     if (wantsToBook && !activeBranch) {
-      availabilityInfo = '\n\nATENCIÓN — SUCURSAL NO CONFIRMADA: El lead quiere agendar pero aún NO ha elegido sucursal. DEBES preguntar cuál sucursal le queda más cerca ANTES de ofrecer cualquier horario. Usa exactamente: "¡Perfecto! 💖 Llevamos 9 años siendo pioneras en depilación láser con 5 sucursales en CDMX y Metepec ✨ Tenemos en: Polanco, Del Valle, Coapa, Oriente y Metepec 🙌 ¿Cuál te queda más cerca?" — NUNCA inventes horarios ni menciones una sucursal específica sin que el lead la haya elegido.'
+      availabilityInfo = '\n\nATENCIÓN — SUCURSAL NO CONFIRMADA: El lead quiere agendar pero aún NO ha elegido sucursal. DEBES preguntar cuál sucursal le queda más cerca ANTES de cualquier otra acción. Usa exactamente: "¡Perfecto! 💖 Llevamos 9 años siendo pioneras en depilación láser con 5 sucursales en CDMX y Metepec ✨ Tenemos en: Polanco, Del Valle, Coapa, Oriente y Metepec 🙌 ¿Cuál te queda más cerca?" — NUNCA menciones horarios ni disponibilidad.'
     }
     if (wantsToBook && activeBranch?.name) {
-      try {
-        var avail = await getAvailabilityForDays(activeBranch.name, 14)
+      var branchWaPhone = BRANCH_WHATSAPP_NUMBERS[activeBranch.name]
+      var alreadyNotified = lead.stage === 'notificacion_sucursal'
 
-        var todayMx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
-        var dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
-        var meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-        var todayStr = todayMx.getFullYear() + '-' + String(todayMx.getMonth() + 1).padStart(2, '0') + '-' + String(todayMx.getDate()).padStart(2, '0')
-        var todayNatural = dias[todayMx.getDay()] + ' ' + todayMx.getDate() + ' de ' + meses[todayMx.getMonth()] + ' de ' + todayMx.getFullYear()
+      if (branchWaPhone && !alreadyNotified) {
+        try {
+          var summaryLines = history.slice(-10).map(function(m) {
+            return (m.role === 'lead' ? '👤 Lead' : '🤖 Bot') + ': ' + m.content
+          })
+          var notifMsg = '🔔 *Lead quiere agendar — CIRE ' + activeBranch.name + '*\n\n'
+            + '👤 *Nombre:* ' + (lead.name || 'No proporcionado') + '\n'
+            + '📱 *WhatsApp:* ' + phoneNumber + '\n'
+            + '🏢 *Sucursal de interés:* ' + activeBranch.name + '\n\n'
+            + '📋 *Contexto de la conversación:*\n' + summaryLines.join('\n')
 
-        var firstAvailDate = avail.match(/\d{4}-\d{2}-\d{2}/)
-        var exampleDate = firstAvailDate ? firstAvailDate[0] : todayStr
-        availabilityInfo = '\n\nFECHA DE HOY: ' + todayStr + ' (' + todayNatural + ')'
-        availabilityInfo += '\nDISPONIBILIDAD REAL DE AGENDA (' + activeBranch.name + ') - próximos 14 días:\n' + avail
-        availabilityInfo += '\n\nINSTRUCCIONES DE AGENDAMIENTO:'
-        availabilityInfo += '\n- Ofrece 2-3 horarios específicos del día que pida el prospecto.'
-        availabilityInfo += '\n- CRÍTICO: Usa ÚNICAMENTE las fechas en formato YYYY-MM-DD que aparecen en la lista de arriba. CÓPIALAS exactamente, no las reformatees ni calcules fechas tú mismo.'
-        if (isPreventaPeriod()) {
-          availabilityInfo += '\n- ESTAMOS EN PREVENTA HOT SALE (4–14 mayo). Cuando confirme horario, usa el tag:'
-          availabilityInfo += '\n  [SOLICITAR_PREVENTA|fecha|hora|servicio|nombre|precio_total]'
-          availabilityInfo += '\n  Ejemplo: [SOLICITAR_PREVENTA|' + exampleDate + '|11:00|Full Body|María López|8500]'
-          availabilityInfo += '\n- precio_total es el precio Hot Sale del servicio elegido (el total completo, no la mitad).'
-          availabilityInfo += '\n- La fecha DEBE ser copiada tal cual de la lista (YYYY-MM-DD). La hora DEBE ser formato HH:MM.'
-          availabilityInfo += '\n- Después del tag escribe: "Para apartar tu lugar de la Preventa Hot Sale 🔥 te pido el 50% ahora: $[precio/2] ✨ La otra mitad la liquidas del 15 al 30 de mayo. Ahora te comparto los datos para la transferencia 💖 Una vez que la realices, mándanos tu comprobante y confirmamos tu lugar."'
-          availabilityInfo += '\n- CRÍTICO: El lugar queda confirmado HASTA que recibamos el comprobante. NUNCA digas "tu cita está confirmada" antes de eso.'
-        } else {
-          availabilityInfo += '\n- Cuando confirme horario, incluye en tu respuesta el tag:'
-          availabilityInfo += '\n  [SOLICITAR_ANTICIPO|fecha|hora|servicio|nombre]'
-          availabilityInfo += '\n  Ejemplo: [SOLICITAR_ANTICIPO|' + exampleDate + '|11:00|Combo Axilas|María López]'
-          availabilityInfo += '\n- La fecha DEBE ser copiada tal cual de la lista (YYYY-MM-DD). La hora DEBE ser formato HH:MM.'
-          availabilityInfo += '\n- El servicio debe ser el que el prospecto eligió en la conversación.'
-          availabilityInfo += '\n- Después del tag escribe: "Para apartar tu lugar te pido un anticipo de $200 que se descuenta el día de tu sesión ✨ Ahora te comparto los datos para la transferencia 💖 Una vez que la realices, mándanos tu comprobante y confirmamos tu cita."'
-          availabilityInfo += '\n- CRÍTICO: La cita queda confirmada HASTA que recibamos el comprobante. NUNCA digas "tu cita está confirmada" antes de eso.'
+          await sendWhatsAppMessage(branchWaPhone, notifMsg)
+          await supabase.from('leads').update({ stage: 'notificacion_sucursal', updated_at: new Date().toISOString() }).eq('id', lead.id)
+          console.log('Notificación de agendamiento enviada a sucursal ' + activeBranch.name + ' (' + branchWaPhone + ')')
+
+          availabilityInfo = '\n\nNOTIFICACIÓN ENVIADA: Ya le avisaste al equipo de CIRE ' + activeBranch.name + ' que este lead quiere agendar. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios ni disponibilidad — los horarios los coordina el equipo de la sucursal directamente. Dile al lead algo como: "¡Listo! 💖 Ya le avisé a nuestro equipo en CIRE ' + activeBranch.name + ' que quieres agendar ✨ En breve te contactan para coordinar tu horario 🙌"'
+        } catch (err) {
+          console.error('Error enviando notificación a sucursal:', err)
         }
-        availabilityInfo += '\n- NO preguntes si es valoración o tratamiento. Asume primera sesión del servicio que eligió.'
-        availabilityInfo += '\n- Si no tienes el nombre del prospecto, PÍDELO antes de agendar.'
-
-        console.log('Disponibilidad consultada para ' + activeBranch.name + ':', avail.substring(0, 200))
-      } catch (err) {
-        console.error('Error consultando disponibilidad:', err)
+      } else {
+        availabilityInfo = '\n\nNOTIFICACIÓN YA ENVIADA ANTERIORMENTE: El equipo de CIRE ' + activeBranch.name + ' ya fue notificado sobre este lead. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios. Recuérdale al lead que pronto le contactarán para coordinar el horario.'
       }
     }
 
