@@ -128,11 +128,11 @@ export async function getAvailabilityForDays(sucursalNombre, numDays) {
 }
 
 var CLABE_POR_SUCURSAL = {
-  'Polanco': { banco: 'BBVA', clabe: '012180001234567890', titular: 'CIRE Polanco SA de CV' },
-  'Valle':   { banco: 'HSBC', clabe: '021180002345678901', titular: 'CIRE Del Valle SA de CV' },
-  'Coapa':   { banco: 'Santander', clabe: '014180003456789012', titular: 'CIRE Coapa SA de CV' },
-  'Oriente': { banco: 'Banorte', clabe: '006180004567890123', titular: 'CIRE Oriente SA de CV' },
-  'Metepec': { banco: 'Banamex', clabe: '002180005678901234', titular: 'CIRE Metepec SA de CV' },
+  'Polanco': { banco: 'BBVA Bancomer', cuenta: '0124923510', clabe: '012180001249235103', titular: 'Cire Depilación Sas de CV', concepto: 'tu nombre completo y servicio de depilación' },
+  'Valle':   { banco: 'BBVA Bancomer', cuenta: '0124923510', clabe: '012180001249235103', titular: 'Cire Depilación Sas de CV', concepto: 'tu nombre completo y servicio de depilación' },
+  'Coapa':   { banco: 'Banorte', cuenta: '1291989155', clabe: '072180012919891550', titular: 'Fabiola Tinoco Vazquez', concepto: 'tu nombre completo y servicio de depilación' },
+  'Oriente': { banco: 'BBVA Bancomer', cuenta: '1508294296', clabe: '012180015082942966', titular: 'Marcela López Gallardo', concepto: 'tu nombre completo y servicio de depilación' },
+  'Metepec': { banco: 'BBVA', cuenta: '0479775676', clabe: '012180004797756762', titular: 'Miguel Ángel Conde Alejandri', tarjeta: '4152313939555350', concepto: 'tu nombre completo y la zona a tratar' },
 }
 
 export function getClabeInfo(sucursalNombre) {

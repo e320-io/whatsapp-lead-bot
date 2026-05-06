@@ -452,10 +452,13 @@ export async function POST(request) {
         var sucursalMapsUrl = MAPS_POR_SUCURSAL[activeBranch?.name]
         var clabeMsg = '💳 *Datos para transferencia — CIRE ' + activeBranch.name + '*\n\n'
           + '🏦 Banco: ' + clabeInfo.banco + '\n'
-          + '🔢 CLABE: ' + clabeInfo.clabe + '\n'
           + '👤 Titular: ' + clabeInfo.titular + '\n'
+          + '🔢 No. Cuenta: ' + clabeInfo.cuenta + '\n'
+          + '🔢 CLABE: ' + clabeInfo.clabe + '\n'
+          + (clabeInfo.tarjeta ? '💳 No. Tarjeta: ' + clabeInfo.tarjeta + '\n' : '')
           + '💰 Monto: $200\n\n'
-          + 'Una vez realizada, envíanos la foto de tu comprobante aquí mismo ✨'
+          + '📌 *En el concepto escribe:* ' + clabeInfo.concepto + '\n\n'
+          + 'Manda foto o captura de pantalla de tu comprobante aquí mismo ✨'
           + (sucursalMapsUrl ? '\n\n📍 *Ubicación CIRE ' + activeBranch.name + ':*\n' + sucursalMapsUrl : '')
         // Se envía después del mensaje principal
         setTimeout(async function() {
@@ -494,10 +497,13 @@ export async function POST(request) {
         var sucursalMapsUrlPreventa = MAPS_POR_SUCURSAL[activeBranch?.name]
         var clabeMsgPreventa = '💳 *Datos para transferencia — CIRE ' + activeBranch.name + '*\n\n'
           + '🏦 Banco: ' + clabePreventa.banco + '\n'
-          + '🔢 CLABE: ' + clabePreventa.clabe + '\n'
           + '👤 Titular: ' + clabePreventa.titular + '\n'
+          + '🔢 No. Cuenta: ' + clabePreventa.cuenta + '\n'
+          + '🔢 CLABE: ' + clabePreventa.clabe + '\n'
+          + (clabePreventa.tarjeta ? '💳 No. Tarjeta: ' + clabePreventa.tarjeta + '\n' : '')
           + '💰 Monto (50%): $' + montoInicial + '\n\n'
-          + 'Una vez realizada, envíanos la foto de tu comprobante aquí mismo ✨'
+          + '📌 *En el concepto escribe:* ' + clabePreventa.concepto + '\n\n'
+          + 'Manda foto o captura de pantalla de tu comprobante aquí mismo ✨'
           + (sucursalMapsUrlPreventa ? '\n\n📍 *Ubicación CIRE ' + activeBranch.name + ':*\n' + sucursalMapsUrlPreventa : '')
         setTimeout(async function() {
           await sendWhatsAppMessage(phoneNumber, clabeMsgPreventa)
