@@ -572,7 +572,8 @@ export async function POST(request) {
       var replyLower = botReply.toLowerCase()
       var bikiniKeywords = ['bikini', 'bikini básico', 'sexy bikini', 'french bikini', 'brazilian', 'zona íntima', 'zona intima']
       var mentionsBikini = bikiniKeywords.some(function(kw) { return replyLower.includes(kw) })
-      if (mentionsBikini) {
+      var mentionsCombo = replyLower.includes('combo')
+      if (mentionsBikini && !mentionsCombo) {
         var bikiniImageAlreadySent = history.some(function(m) {
           return m.role === 'bot' && bikiniKeywords.some(function(kw) { return (m.content || '').toLowerCase().includes(kw) })
         })
