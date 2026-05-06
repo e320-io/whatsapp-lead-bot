@@ -5,6 +5,14 @@ import { generateBotResponse } from '@/lib/claude'
 import { getAvailabilityForDays, createAppointment, getClabeInfo, createPreventaPaquete } from '@/lib/pos'
 import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hubspot'
 
+var MAPS_POR_SUCURSAL = {
+  'Coapa':   'https://maps.app.goo.gl/9C2enEz7xchp9xen6',
+  'Valle':   'https://maps.app.goo.gl/Dp6V3wD4NyfTo8TL6',
+  'Polanco': 'https://maps.app.goo.gl/VTFiK9RiGh7Sd5QK6',
+  'Metepec': 'https://maps.app.goo.gl/vUPxqhHKa26aRVaDA',
+  'Oriente': 'https://maps.app.goo.gl/pqvzsTAh3zEv928R7',
+}
+
 // Aliases comunes para detectar sucursal desde texto libre del usuario
 var BRANCH_ALIASES = {
   'polanco': 'Polanco',
@@ -441,12 +449,14 @@ export async function POST(request) {
       // Enviar datos bancarios en mensaje separado
       var clabeInfo = getClabeInfo(activeBranch?.name)
       if (clabeInfo) {
+        var sucursalMapsUrl = MAPS_POR_SUCURSAL[activeBranch?.name]
         var clabeMsg = '💳 *Datos para transferencia — CIRE ' + activeBranch.name + '*\n\n'
           + '🏦 Banco: ' + clabeInfo.banco + '\n'
           + '🔢 CLABE: ' + clabeInfo.clabe + '\n'
           + '👤 Titular: ' + clabeInfo.titular + '\n'
           + '💰 Monto: $200\n\n'
           + 'Una vez realizada, envíanos la foto de tu comprobante aquí mismo ✨'
+          + (sucursalMapsUrl ? '\n\n📍 *Ubicación CIRE ' + activeBranch.name + ':*\n' + sucursalMapsUrl : '')
         // Se envía después del mensaje principal
         setTimeout(async function() {
           await sendWhatsAppMessage(phoneNumber, clabeMsg)
@@ -481,12 +491,14 @@ export async function POST(request) {
       // Enviar datos bancarios con el monto del 50%
       var clabePreventa = getClabeInfo(activeBranch?.name)
       if (clabePreventa) {
+        var sucursalMapsUrlPreventa = MAPS_POR_SUCURSAL[activeBranch?.name]
         var clabeMsgPreventa = '💳 *Datos para transferencia — CIRE ' + activeBranch.name + '*\n\n'
           + '🏦 Banco: ' + clabePreventa.banco + '\n'
           + '🔢 CLABE: ' + clabePreventa.clabe + '\n'
           + '👤 Titular: ' + clabePreventa.titular + '\n'
           + '💰 Monto (50%): $' + montoInicial + '\n\n'
           + 'Una vez realizada, envíanos la foto de tu comprobante aquí mismo ✨'
+          + (sucursalMapsUrlPreventa ? '\n\n📍 *Ubicación CIRE ' + activeBranch.name + ':*\n' + sucursalMapsUrlPreventa : '')
         setTimeout(async function() {
           await sendWhatsAppMessage(phoneNumber, clabeMsgPreventa)
         }, 1500)
@@ -548,7 +560,7 @@ export async function POST(request) {
     })
     await sendWhatsAppMessage(phoneNumber, botReply)
 
-    // 10b. Enviar imagen automática si el contexto lo requiere (solo una vez por conversación)
+    // 10c. Enviar imagen automática si el contexto lo requiere (solo una vez por conversación)
     var appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
     if (appUrl) {
       var replyLower = botReply.toLowerCase()
