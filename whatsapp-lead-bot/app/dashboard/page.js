@@ -103,9 +103,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     const container = messagesContainerRef.current
-    if (!container) return
+    if (!container || messages.length === 0) return
     if (isInitialLoadRef.current) {
-      // Carga inicial: siempre ir al fondo sin animación
+      // Carga inicial con mensajes reales: ir al fondo sin animación
       messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
       isInitialLoadRef.current = false
     } else {
