@@ -548,20 +548,25 @@ export async function POST(request) {
     })
     await sendWhatsAppMessage(phoneNumber, botReply)
 
-    // 10b. Enviar imagen automática si el contexto lo requiere
+    // 10b. Enviar imagen automática si el contexto lo requiere (solo una vez por conversación)
     var appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
     if (appUrl) {
       var replyLower = botReply.toLowerCase()
       var bikiniKeywords = ['bikini', 'bikini básico', 'sexy bikini', 'french bikini', 'brazilian', 'zona íntima', 'zona intima']
       var mentionsBikini = bikiniKeywords.some(function(kw) { return replyLower.includes(kw) })
       if (mentionsBikini) {
-        setTimeout(async function() {
-          try {
-            await sendWhatsAppImage(phoneNumber, appUrl + '/images/Bikini-hotsale.jpeg')
-          } catch(e) {
-            console.error('Error enviando imagen bikini:', e.message)
-          }
-        }, 1000)
+        var bikiniImageAlreadySent = history.some(function(m) {
+          return m.role === 'bot' && bikiniKeywords.some(function(kw) { return (m.content || '').toLowerCase().includes(kw) })
+        })
+        if (!bikiniImageAlreadySent) {
+          setTimeout(async function() {
+            try {
+              await sendWhatsAppImage(phoneNumber, appUrl + '/images/Bikini-hotsale.jpeg')
+            } catch(e) {
+              console.error('Error enviando imagen bikini:', e.message)
+            }
+          }, 1000)
+        }
       }
     }
 
