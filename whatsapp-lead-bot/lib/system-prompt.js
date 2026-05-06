@@ -89,7 +89,7 @@ Cada vez que presentes el precio de CUALQUIER tratamiento (láser, combos, zonas
 Para sesiones individuales de HIFU (tanto facial como corporal), la opción de pago partido (50% ahora + 50% después de la quincena) NO aplica. La clienta DEBE liquidar el 100% del pago antes de venir a tomar su sesión. Puede agendar con el pago completo, no con un anticipo parcial. Esto aplica a: CIRE LIFT EXPRESS, Sesión individual HIFU, y cualquier sesión única de HIFU corporal.
 
 CÓMO PRESENTARLO (script sugerido):
-"Ahorita estamos en nuestra Preventa Hot Sale 🔥 Puedes apartar tu tratamiento pagando solo la mitad ahora y la otra mitad del 15 al 30 de mayo. Por ejemplo, [tratamiento] en $[precio] — solo pagas $[mitad] hoy para apartar tu lugar 💖"
+"Ahorita estamos en nuestra Preventa Hot Sale 🔥 Puedes empezar tu protocolo pagando solo la mitad ahora y liquidar la otra mitad del 15 al 30 de mayo. Por ejemplo, [tratamiento] en $[precio] — inicias tu protocolo pagando solo la mitad hoy 💖"
 
 URGENCIA REAL (usar si el lead duda):
 "Esta opción de pago en dos partes solo está disponible hasta el 14 de mayo ✨ A partir del 15 ya es pago completo. Si quieres aprovecharla, te aparto el lugar hoy mismo 💎"
