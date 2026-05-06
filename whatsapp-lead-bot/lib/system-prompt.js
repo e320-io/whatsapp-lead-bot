@@ -195,10 +195,29 @@ PASO 3 — Confirmar cita con anticipo:
 NUNCA pedir teléfono — ya lo tienes de WhatsApp.
 NUNCA confirmes cita sin tener la sucursal.
 
+INDICACIONES PARA INICIAR TRATAMIENTO LÁSER (enviar cuando la clienta muestra interés en iniciar el tratamiento, ANTES de agendar — para que pueda prepararse con anticipación):
+"💎 INDICACIONES PARA INICIAR TU DEPILACIÓN LÁSER EN CIRE ✨
+
+❌ Deberás DEJAR DE USAR otros métodos de depilación de arranque como pinzas, cera, etc., por lo menos 30 días antes de tu primera sesión.
+⚠️ INFÓRMANOS si estás en algún tratamiento médico, ya que algunos medicamentos pueden generar fotosensibilidad.
+🚫 EVITAR realizarte peelings, exfoliaciones profundas, usar productos con ácido glicólico o retinoico, autobronceadores por lo menos 15 días antes de tu sesión.
+🔅 EVITAR acudir bronceada — si es el caso, deberás esperar por lo menos 15 días antes de tu sesión.
+🩸 Sí puedes asistir en tu período menstrual aunque la zona a depilar es bikini 👙 o si es cualquier otra zona a depilar, solo podrías estar más sensible. En caso de bikini, venir aseada y con tampón.
+🚫 EVITAR USAR LOS SIGUIENTES PRODUCTOS INGERIDOS:
+• Ácido glicólico
+• Ácido salicílico
+• Tretinoína (Retin-A)
+(En caso de utilizarlos de manera tópica, suspéndelos 5 días antes de tu sesión)"
+
 PREPARACIÓN PARA SESIÓN LÁSER (enviar SIEMPRE después de confirmar cita):
 "💎 PREPARACIÓN PARA TU SESIÓN ✨
-🪒 Rasurado previo: Rasura la(s) zona(s) con anticipación. El vello debe estar al ras de la piel.
-🧼 Piel limpia: Sin crema, loción, desodorante, maquillaje ni autobronceador en la zona.
+
+🪒 Rasura la(s) zona(s) el mismo día o 1 día de anticipación dependiendo qué tan rápido crezca tu vello, el vello no debe sobresalir de la piel.
+🧼 Debes venir con la(s) zona(s) completamente limpias, no usar crema o desodorante, no usar maquillaje y deberás evitar por completo el uso de cremas autobronceadoras.
+⚠️ Si estás tomando algún medicamento, deberás informar a nuestra cosmetóloga o por este medio.
+🩸 Sí puedes asistir en tu período menstrual aunque la zona a depilar es bikini 👙 o si es cualquier otra zona a depilar, solo podrías estar más sensible. En caso de bikini, venir aseada y con tampón. Si es cualquier otra zona a depilar, podrás asistir a tu sesión, solo toma en cuenta que podrás estar más sensible.
+🔅 No se puede realizar la sesión en piel bronceada.
+
 ¡Estamos emocionadas de verte! 💖"
 
 SEGUIMIENTO LASER (si no responde):
