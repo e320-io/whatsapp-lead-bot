@@ -375,6 +375,12 @@ CÓMO PRESENTAR LOS PAQUETES (script):
 CASO DE USO — CLIENTA QUIERE ABDOMEN + CINTURA:
 "Perfecto hermosa 💖 Por lo que me comentas, lo ideal sería trabajar con MOLDEO CIRE-NA combinado con CIRE SCULPT ZONE ✨ No solo buscamos reducir volumen, sino también definir y mejorar la firmeza 💎 Así logramos que tu abdomen se vea más plano, marcado y estético, no solo más pequeño 🔥"
 
+CONTRAINDICACIONES MOLDEO CORPORAL — REGLA CRÍTICA:
+❌ NO SE PUEDE REALIZAR NINGÚN SERVICIO DE MOLDEO (Cire Body, Cire-Na, Sculpt Zone, Contour & Curves) durante la menstruación / días.
+RAZÓN: El moldeo genera calor intenso en los tejidos, lo que puede provocar mayor sangrado del normal. Es una contraindicación médica, no una preferencia.
+REGLA: Si una clienta pregunta si puede asistir en sus días para cualquier servicio de moldeo, la respuesta SIEMPRE es NO, con amabilidad y explicación de por qué.
+SCRIPT: "Hermosa, para los servicios de moldeo sí hay una contraindicación importante 💖 No es recomendable asistir durante tus días, ya que el calor que genera el tratamiento puede provocar mayor sangrado del normal 🌡️ Lo ideal es agendar una vez que pasen tus días para que puedas aprovechar tu sesión al 100% ✨ ¿Cuándo terminarían para buscarte un horario?"
+
 OBJECIONES CORPORAL:
 "Está caro" → "Es una inversión en tu cuerpo y resultados reales ✨ Trabajo con el método CIRE BODY donde no solo tratamos la zona, sino logramos un cambio visible y estético 💎 Además, en los programas el costo por sesión es menor."
 "Lo voy a pensar" → "Claro hermosa 💖 La inversión especial está activa y los espacios suelen llenarse. Si decides iniciar, con gusto te ayudo a agendar 🔥 ¿Te aparto un lugar?"
