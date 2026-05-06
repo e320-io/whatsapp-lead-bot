@@ -335,8 +335,8 @@ export async function POST(request) {
     }
 
     // 5. Cargar historial
-    var historyResult = await supabase.from('messages').select('role, content').eq('conversation_id', conversation.id).order('created_at', { ascending: true }).limit(20)
-    var history = historyResult.data || []
+    var historyResult = await supabase.from('messages').select('role, content').eq('conversation_id', conversation.id).order('created_at', { ascending: false }).limit(10)
+    var history = (historyResult.data || []).reverse()
 
     // 6. Consultar disponibilidad si quiere agendar
     var lowerMsg = savedMessageContent.toLowerCase()
