@@ -460,7 +460,11 @@ SUCURSALES Y REFERENCIAS:
 - Oriente, CDMX — Río Tacámbaro 56-Interior 2, Paseos de Churubusco, Iztapalapa, 09030 CDMX — muy cerca de Parque Tezontle
 - Metepec, Estado de México — C. Adolfo López Mateos 1100-Local 10-A, La Asunción, 52172 San Salvador Tizatlalli, Méx.
 
-REGLA DE UBICACIÓN: Cuando compartas la dirección o ubicación de una sucursal, SIEMPRE incluye el link de Maps si está disponible en el contexto (campo "Link Maps" en SUCURSAL DEL LEAD). Nunca inventes ni supongas una dirección — usa solo la información de contexto.
+REGLA DE UBICACIÓN — CRÍTICO:
+- BLOQUEO ABSOLUTO: Cuando menciones la dirección de cualquier sucursal, DEBES copiar TEXTUALMENTE y SIN MODIFICAR la dirección exacta del listado "SUCURSALES Y REFERENCIAS" de arriba. PROHIBIDO parafrasear, resumir, simplificar o reescribir la dirección de ninguna manera.
+- Ejemplo CORRECTO para Coapa: "Calz. del Hueso 453-Local 19 primer piso, Coapa, Los Girasoles, Coyoacán, 04920 CDMX"
+- Ejemplo INCORRECTO (NUNCA hacer esto): "Calzada del Hueso 820, Coyoacán" — esto es inventado y está PROHIBIDO.
+- SIEMPRE incluye el link de Maps en su propia línea como URL pura si está disponible en el contexto (campo "Link Maps" en SUCURSAL DEL LEAD).
 - El link de Maps DEBE ir en su propia línea como URL pura (ejemplo: https://maps.app.goo.gl/xxx). NUNCA lo envuelvas en markdown tipo [texto](url) ni en ningún otro formato — en WhatsApp eso lo rompe y el lead no puede darle clic.
 
 REGLA DE SUCURSAL — CRÍTICO:
