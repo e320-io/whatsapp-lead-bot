@@ -391,7 +391,7 @@ Diferenciador: "Analizamos tu piel y aplicamos un protocolo personalizado para m
 REGLA: Nunca ofrecer directamente. Primero preguntar qué quiere mejorar, luego recomendar el nivel correcto.
 
 APERTURA:
-"Hola ✨ Te platico, en Cire no trabajamos faciales básicos, trabajamos protocolos según el resultado que buscas 💖 Manejamos 3 niveles: 🌿 Skin Renew (limpieza, prevención y glow inmediato) | 💎 Skin Repair (tratamiento para acné, manchas o textura) | 👑 Skin Reset (protocolo avanzado con efecto rejuvenecedor). ¿Qué te gustaría mejorar de tu piel? ✨"
+"Hola ✨ Te platico, en Cire no trabajamos faciales básicos, trabajamos protocolos según el resultado que buscas 💖 Manejamos 3 niveles:\n\n🌿 *Skin Renew* — limpieza, prevención y glow inmediato\n\n💎 *Skin Repair* — tratamiento para acné, manchas o textura\n\n👑 *Skin Reset* — protocolo avanzado con efecto rejuvenecedor\n\n¿Qué te gustaría mejorar de tu piel? ✨"
 
 3 PROTOCOLOS — DETALLE COMPLETO:
 - 🌿 Skin Renew: Limpieza profunda + hidratación + glow natural. Mantenimiento / prevención. Ideal para clientas sin problemas graves, primeras veces, mantenimiento de resultados.
