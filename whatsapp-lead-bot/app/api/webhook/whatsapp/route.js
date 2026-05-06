@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
-import { sendWhatsAppMessage, markAsRead } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, sendWhatsAppImage, markAsRead } from '@/lib/whatsapp'
 import { generateBotResponse } from '@/lib/claude'
 import { getAvailabilityForDays, createAppointment, getClabeInfo, createPreventaPaquete } from '@/lib/pos'
 import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hubspot'
@@ -547,6 +547,23 @@ export async function POST(request) {
       conversation_id: conversation.id, business_id: business.id, role: 'bot', content: botReply
     })
     await sendWhatsAppMessage(phoneNumber, botReply)
+
+    // 10b. Enviar imagen automática si el contexto lo requiere
+    var appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    if (appUrl) {
+      var replyLower = botReply.toLowerCase()
+      var bikiniKeywords = ['bikini', 'bikini básico', 'sexy bikini', 'french bikini', 'brazilian', 'zona íntima', 'zona intima']
+      var mentionsBikini = bikiniKeywords.some(function(kw) { return replyLower.includes(kw) })
+      if (mentionsBikini) {
+        setTimeout(async function() {
+          try {
+            await sendWhatsAppImage(phoneNumber, appUrl + '/images/Bikini-hotsale.jpeg')
+          } catch(e) {
+            console.error('Error enviando imagen bikini:', e.message)
+          }
+        }, 1000)
+      }
+    }
 
     // 11. Actualizar etapa
     if (lead.stage === 'nuevo' && history.length > 2) {

@@ -61,6 +61,58 @@ export async function sendWhatsAppMessage(to, text) {
 }
 
 /**
+ * Enviar imagen por WhatsApp via Meta Cloud API
+ * @param {string} to - Número de teléfono destino
+ * @param {string} imageUrl - URL pública de la imagen
+ * @param {string} [caption] - Texto opcional que acompaña la imagen
+ */
+export async function sendWhatsAppImage(to, imageUrl, caption = '') {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+
+  const numbersToTry = [normalizePhoneNumber(to)]
+  if (normalizePhoneNumber(to) !== to) {
+    numbersToTry.push(to)
+  }
+
+  let lastError = null
+
+  for (const number of numbersToTry) {
+    const imagePayload = { link: imageUrl }
+    if (caption) imagePayload.caption = caption
+
+    const response = await fetch(
+      `${GRAPH_API_URL}/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: number,
+          type: 'image',
+          image: imagePayload,
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (response.ok) {
+      console.log('Imagen enviada exitosamente a:', number)
+      return data
+    }
+
+    console.error('Error enviando imagen a ' + number + ':', data)
+    lastError = data
+  }
+
+  throw new Error('Meta API error (imagen): ' + JSON.stringify(lastError))
+}
+
+/**
  * Marcar mensaje como leído
  * @param {string} messageId - ID del mensaje a marcar
  */

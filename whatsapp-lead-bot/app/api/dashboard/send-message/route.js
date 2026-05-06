@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
-import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, sendWhatsAppImage } from '@/lib/whatsapp'
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS })
+}
 
 export async function POST(request) {
   try {
-    const { leadId, conversationId, message } = await request.json()
-    if (!leadId || !conversationId || !message?.trim()) {
-      return NextResponse.json({ error: 'leadId, conversationId y message son requeridos' }, { status: 400 })
+    const { leadId, conversationId, message, imageUrl } = await request.json()
+    if (!leadId || !conversationId || (!message?.trim() && !imageUrl)) {
+      return NextResponse.json({ error: 'leadId, conversationId y message o imageUrl son requeridos' }, { status: 400, headers: CORS })
     }
 
     const supabase = createSupabaseAdmin()
@@ -19,18 +29,30 @@ export async function POST(request) {
 
     if (leadError || !lead) throw new Error('Lead no encontrado')
 
-    await sendWhatsAppMessage(lead.phone, message.trim())
+    if (message?.trim()) {
+      await sendWhatsAppMessage(lead.phone, message.trim())
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        business_id: lead.business_id,
+        role: 'bot',
+        content: message.trim(),
+        is_human_agent: true,
+      })
+    }
 
-    await supabase.from('messages').insert({
-      conversation_id: conversationId,
-      business_id: lead.business_id,
-      role: 'bot',
-      content: message.trim(),
-      is_human_agent: true,
-    })
+    if (imageUrl) {
+      await sendWhatsAppImage(lead.phone, imageUrl)
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        business_id: lead.business_id,
+        role: 'bot',
+        content: '[Imagen enviada: ' + imageUrl.split('/').pop() + ']',
+        is_human_agent: true,
+      })
+    }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true }, { headers: CORS })
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500, headers: CORS })
   }
 }
