@@ -7,7 +7,7 @@ import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hu
 
 var MAPS_POR_SUCURSAL = {
   'Coapa':   'https://maps.app.goo.gl/9C2enEz7xchp9xen6',
-  'Valle':   'https://maps.app.goo.gl/Dp6V3wD4NyfTo8TL6',
+  'Valle':   'https://maps.app.goo.gl/adYDC1tNe2xcpCDW8',
   'Polanco': 'https://maps.app.goo.gl/VTFiK9RiGh7Sd5QK6',
   'Metepec': 'https://maps.app.goo.gl/vUPxqhHKa26aRVaDA',
   'Oriente': 'https://maps.app.goo.gl/pqvzsTAh3zEv928R7',
@@ -17,6 +17,7 @@ var MAPS_POR_SUCURSAL = {
 var BRANCH_ALIASES = {
   'polanco': 'Polanco',
   'del valle': 'Valle',
+  'valle': 'Valle',
   'galerias insurgentes': 'Valle',
   'insurgentes': 'Valle',
   'coapa': 'Coapa',
@@ -411,7 +412,7 @@ export async function POST(request) {
     var branchConfig = activeBranch?.config || business.config || {}
     // Solo pasar sucursal a Claude si fue confirmada explícitamente (no fallback)
     var branchInfo = (activeBranch && branchConfirmed)
-      ? { sucursal: activeBranch.name, direccion: activeBranch.address, zona: activeBranch.zone }
+      ? { sucursal: activeBranch.name, direccion: activeBranch.address, zona: activeBranch.zone, maps_url: MAPS_POR_SUCURSAL[activeBranch.name] || null }
       : {}
 
     // Si el mensaje es solo una keyword de Meta Ads (vacío después de limpiar) Y es conversación nueva → trigger de saludo

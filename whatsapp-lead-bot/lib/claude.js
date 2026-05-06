@@ -7,7 +7,7 @@ const anthropic = new Anthropic({
 
 export async function generateBotResponse(_systemPrompt, messageHistory, leadInfo, branchConfig, availabilityInfo, allBranches) {
   const branchInfo = leadInfo.metadata?.sucursal
-    ? `\nSUCURSAL DEL LEAD: ${leadInfo.metadata.sucursal}${leadInfo.metadata.direccion ? ` (${leadInfo.metadata.direccion})` : ''}${leadInfo.metadata.zona ? ` - Zona: ${leadInfo.metadata.zona}` : ''}`
+    ? `\nSUCURSAL DEL LEAD: ${leadInfo.metadata.sucursal}${leadInfo.metadata.direccion ? ` (${leadInfo.metadata.direccion})` : ''}${leadInfo.metadata.zona ? ` - Zona: ${leadInfo.metadata.zona}` : ''}${leadInfo.metadata.maps_url ? ` | Link Maps: ${leadInfo.metadata.maps_url}` : ''}`
     : ''
 
   // Lista de sucursales para el system prompt (siempre disponible para contexto)
