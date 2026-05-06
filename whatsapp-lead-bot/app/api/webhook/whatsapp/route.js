@@ -226,9 +226,16 @@ export async function POST(request) {
       var detectedByName = detectBranchByName(messageText, allBranches)
       if (detectedByName) {
         activeBranch = detectedByName
-        keywordBranchDetected = true
         branchConfirmed = true
-        console.log('Sucursal detectada por nombre en mensaje:', detectedByName.name)
+        var msgLowerForLocation = messageText.toLowerCase()
+        // Si el mensaje es una pregunta de ubicación ("donde está coapa?"), solo dar contexto a Claude
+        // sin asignar ni persistir la sucursal en el lead
+        var isAskingAboutBranch = /\b(donde|dónde|dirección|direccion|ubicacion|ubicación|como llego|cómo llego)\b/.test(msgLowerForLocation)
+          || (messageText.includes('?') && /\b(donde|dónde|esta|está|queda|quere|dirección|como|cómo)\b/.test(msgLowerForLocation))
+        if (!isAskingAboutBranch) {
+          keywordBranchDetected = true
+        }
+        console.log('Sucursal detectada por nombre en mensaje:', detectedByName.name, isAskingAboutBranch ? '(pregunta de ubicación — branch_id no modificado)' : '(selección)')
       }
     }
 

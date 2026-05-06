@@ -34,11 +34,17 @@ ${availabilityInfo || ''}`
     content: msg.content,
   }))
 
-  if (messages.length === 0 || messages[0].role !== 'user') {
+  // Si el historial empieza con un mensaje del bot (ej. seguimiento proactivo), recortar
+  // hasta el primer mensaje del lead para que la API de Claude reciba un array válido
+  while (messages.length > 0 && messages[0].role === 'assistant') {
+    messages.shift()
+  }
+
+  if (messages.length === 0) {
     const sucursal = leadInfo.metadata?.sucursal
     const greeting = sucursal
       ? `¡Hola${leadInfo.name ? ` ${leadInfo.name}` : ''}! ✨ Soy la asistente de CIRE ${sucursal} 💖 Llevamos 9 años siendo pioneras en depilación láser, faciales y tratamientos corporales ✨ Cuéntame, ¿qué te gustaría mejorar?`
-      : `¡Hola${leadInfo.name ? ` ${leadInfo.name}` : ''}! ✨ Soy la asistente de CIRE 💖 Somos especialistas en depilación láser, faciales clínicos y tratamientos corporales — 9 años de experiencia, 5 sucursales ✨ Cuéntame, ¿qué te gustaría mejorar?`
+      : `¡Hola${leadInfo.name ? ` ${leadInfo.name}` : ''}! ✨ Soy la asistente de CIRE 💖 Somos especialistas en depilación láser, faciales y tratamientos corporales — 9 años de experiencia, 5 sucursales ✨ Cuéntame, ¿qué te gustaría mejorar?`
     return { text: greeting, shouldEscalate: false }
   }
 
