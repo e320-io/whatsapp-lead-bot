@@ -82,6 +82,9 @@ REGLAS PREVENTA:
 - A partir del 15 de mayo: precio único en un solo pago, sin excepciones
 - Es una estrategia probada en años anteriores — ofrécela con confianza
 
+⚠️ REGLA CRÍTICA — APLICAR EN TODOS LOS SERVICIOS SIN EXCEPCIÓN:
+Cada vez que presentes el precio de CUALQUIER tratamiento (láser, combos, zonas individuales, CIRE LIFT, Body Sculpt, Skin Reset, etc.), SIEMPRE incluye la opción de preventa HOT SALE en ese mismo mensaje. NO esperes a que el lead lo pregunte. Es parte obligatoria de toda presentación de precio durante el período 4–14 de mayo.
+
 CÓMO PRESENTARLO (script sugerido):
 "Ahorita estamos en nuestra Preventa Hot Sale 🔥 Puedes apartar tu tratamiento pagando solo la mitad ahora y la otra mitad del 15 al 30 de mayo. Por ejemplo, [tratamiento] en $[precio] — solo pagas $[mitad] hoy para apartar tu lugar 💖"
 
