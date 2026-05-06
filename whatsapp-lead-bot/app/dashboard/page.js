@@ -791,162 +791,79 @@ export default function Dashboard() {
               <div ref={messagesEndRef} />
             </div>
 
-            {botPaused ? (
-              <div style={{ background: '#fff', borderTop: '1px solid #e5e7eb', position: 'relative' }}>
-                {/* Quick Reply Panel */}
-                {showQRPanel && (
-                  <div
-                    ref={qrPanelRef}
-                    style={{
-                      position: 'absolute', bottom: '100%', left: 0, right: 0,
-                      background: '#fff', border: '1px solid #e5e7eb', borderBottom: 'none',
-                      boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '340px',
-                      display: 'flex', flexDirection: 'column',
-                    }}
-                  >
-                    <div style={{ padding: '10px 12px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#374151', whiteSpace: 'nowrap' }}>💬 Respuestas rápidas</span>
-                      <input
-                        autoFocus
-                        value={qrFilter}
-                        onChange={(e) => setQrFilter(e.target.value)}
-                        placeholder="Buscar atajo..."
-                        style={{
-                          flex: 1, padding: '5px 10px', borderRadius: '12px', border: '1px solid #e5e7eb',
-                          fontSize: '13px', outline: 'none',
-                        }}
-                      />
-                      <button
-                        onClick={() => { setShowAddQR(true); setQrFilter('') }}
-                        style={{ padding: '5px 10px', borderRadius: '12px', border: '1px solid #075e54', background: '#075e54', color: '#fff', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                      >+ Nueva</button>
-                      <button
-                        onClick={() => { setShowQRPanel(false); setShowAddQR(false); setQrFilter('') }}
-                        style={{ padding: '5px 8px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: '13px', cursor: 'pointer', color: '#6b7280' }}
-                      >✕</button>
+            {/* Panel de respuestas rápidas — en flujo normal, no flotante */}
+            {botPaused && showQRPanel && (
+              <div ref={qrPanelRef} style={{ borderTop: '1px solid #e5e7eb', background: '#fff', display: 'flex', flexDirection: 'column', height: '280px', flexShrink: 0 }}>
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#374151', whiteSpace: 'nowrap' }}>💬 Respuestas rápidas</span>
+                  <input
+                    autoFocus
+                    value={qrFilter}
+                    onChange={(e) => setQrFilter(e.target.value)}
+                    placeholder="Buscar atajo o contenido..."
+                    style={{ flex: 1, padding: '5px 10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', outline: 'none' }}
+                  />
+                  <button onClick={() => { setShowAddQR((v) => !v); setQrFilter('') }} style={{ padding: '4px 10px', borderRadius: '8px', border: 'none', background: '#075e54', color: '#fff', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Nueva</button>
+                  <button onClick={() => { setShowQRPanel(false); setShowAddQR(false); setQrFilter('') }} style={{ padding: '4px 7px', borderRadius: '8px', border: '1px solid #e5e7eb', background: 'transparent', fontSize: '13px', cursor: 'pointer', color: '#6b7280' }}>✕</button>
+                </div>
+                {showAddQR && (
+                  <div style={{ padding: '8px 12px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                      <input value={newQR.shortcut} onChange={(e) => setNewQR((p) => ({ ...p, shortcut: e.target.value }))} placeholder="Nombre del atajo (ej: hola)" style={{ flex: 1, padding: '5px 10px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px', outline: 'none' }} />
+                      <button onClick={saveQuickReply} disabled={savingQR || !newQR.shortcut.trim() || !newQR.content.trim()} style={{ padding: '5px 12px', borderRadius: '8px', border: 'none', background: savingQR ? '#9ca3af' : '#075e54', color: '#fff', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>{savingQR ? '...' : 'Guardar'}</button>
+                      <button onClick={() => { setShowAddQR(false); setNewQR({ shortcut: '', content: '' }) }} style={{ padding: '5px 10px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', fontSize: '12px', cursor: 'pointer', color: '#6b7280' }}>✕</button>
                     </div>
-
-                    {showAddQR ? (
-                      <div style={{ padding: '12px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                          <input
-                            value={newQR.shortcut}
-                            onChange={(e) => setNewQR((p) => ({ ...p, shortcut: e.target.value }))}
-                            placeholder="Atajo (ej: hola)"
-                            style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '13px', outline: 'none' }}
-                          />
-                          <button
-                            onClick={saveQuickReply}
-                            disabled={savingQR || !newQR.shortcut.trim() || !newQR.content.trim()}
-                            style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: savingQR ? '#9ca3af' : '#075e54', color: '#fff', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}
-                          >{savingQR ? '...' : 'Guardar'}</button>
-                          <button
-                            onClick={() => { setShowAddQR(false); setNewQR({ shortcut: '', content: '' }) }}
-                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', fontSize: '13px', cursor: 'pointer', color: '#6b7280' }}
-                          >Cancelar</button>
-                        </div>
-                        <textarea
-                          value={newQR.content}
-                          onChange={(e) => setNewQR((p) => ({ ...p, content: e.target.value }))}
-                          placeholder="Contenido del mensaje..."
-                          rows={3}
-                          style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '13px', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
-                        />
-                      </div>
-                    ) : null}
-
-                    <div style={{ overflowY: 'auto', flex: 1 }}>
-                      {quickReplies
-                        .filter((qr) => !qrFilter || qr.shortcut.includes(qrFilter.toLowerCase().replace('/', '')) || qr.content.toLowerCase().includes(qrFilter.toLowerCase()))
-                        .map((qr) => (
-                          <div
-                            key={qr.id}
-                            style={{ padding: '10px 12px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '8px' }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#f0fdf4'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = ''}
-                            onClick={() => { setHumanMessage(qr.content); setShowQRPanel(false); setQrFilter('') }}
-                          >
-                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#075e54', background: '#f0fdf4', padding: '2px 8px', borderRadius: '10px', whiteSpace: 'nowrap', border: '1px solid #bbf7d0', flexShrink: 0 }}>/{qr.shortcut}</span>
-                            <span style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.4', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                              {qr.content}
-                            </span>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); deleteQuickReply(qr.id) }}
-                              style={{ marginLeft: 'auto', padding: '2px 6px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fff', color: '#dc2626', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}
-                            >🗑</button>
-                          </div>
-                        ))}
-                      {quickReplies.filter((qr) => !qrFilter || qr.shortcut.includes(qrFilter.toLowerCase().replace('/', '')) || qr.content.toLowerCase().includes(qrFilter.toLowerCase())).length === 0 && (
-                        <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>No hay respuestas que coincidan</div>
-                      )}
-                    </div>
+                    <textarea value={newQR.content} onChange={(e) => setNewQR((p) => ({ ...p, content: e.target.value }))} placeholder="Contenido del mensaje..." rows={2} style={{ width: '100%', padding: '5px 10px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px', resize: 'none', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
                 )}
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {quickReplies
+                    .filter((qr) => !qrFilter || qr.shortcut.includes(qrFilter.toLowerCase().replace('/', '')) || qr.content.toLowerCase().includes(qrFilter.toLowerCase()))
+                    .map((qr) => (
+                      <div key={qr.id}
+                        style={{ padding: '8px 12px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f0fdf4'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = ''}
+                        onClick={() => { setHumanMessage(qr.content); setShowQRPanel(false); setQrFilter('') }}
+                      >
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#075e54', background: '#f0fdf4', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap', border: '1px solid #bbf7d0', flexShrink: 0, minWidth: '70px', textAlign: 'center' }}>/{qr.shortcut}</span>
+                        <span style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.4', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{qr.content.split('\n')[0]}</span>
+                        <button onClick={(e) => { e.stopPropagation(); deleteQuickReply(qr.id) }} style={{ padding: '2px 6px', borderRadius: '6px', border: '1px solid #fecaca', background: 'transparent', color: '#dc2626', fontSize: '11px', cursor: 'pointer', flexShrink: 0, opacity: 0.6 }} onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}>🗑</button>
+                      </div>
+                    ))}
+                  {quickReplies.filter((qr) => !qrFilter || qr.shortcut.includes(qrFilter.toLowerCase().replace('/', '')) || qr.content.toLowerCase().includes(qrFilter.toLowerCase())).length === 0 && (
+                    <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>No hay atajos que coincidan</div>
+                  )}
+                </div>
+              </div>
+            )}
 
+            {botPaused ? (
+              <div style={{ background: '#fff', borderTop: '1px solid #e5e7eb' }}>
                 <div style={{ padding: '6px 16px', display: 'flex', gap: '6px', flexWrap: 'wrap', borderBottom: '1px solid #f3f4f6' }}>
                   {PRESET_IMAGES.map((img) => (
-                    <button
-                      key={img.file}
-                      onClick={() => handleSendImage(img.file)}
-                      disabled={sendingImage === img.file}
-                      style={{
-                        padding: '4px 12px', borderRadius: '16px', border: '1px solid #d1d5db',
-                        background: sendingImage === img.file ? '#f3f4f6' : '#fff',
-                        fontSize: '12px', cursor: sendingImage === img.file ? 'not-allowed' : 'pointer',
-                        color: '#374151', fontWeight: '500',
-                      }}
-                    >
+                    <button key={img.file} onClick={() => handleSendImage(img.file)} disabled={sendingImage === img.file}
+                      style={{ padding: '4px 12px', borderRadius: '16px', border: '1px solid #d1d5db', background: sendingImage === img.file ? '#f3f4f6' : '#fff', fontSize: '12px', cursor: sendingImage === img.file ? 'not-allowed' : 'pointer', color: '#374151', fontWeight: '500' }}>
                       {sendingImage === img.file ? 'Enviando...' : img.label}
                     </button>
                   ))}
                 </div>
-                <div style={{ padding: '10px 16px', display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                  <div style={{ fontSize: '11px', color: '#1d4ed8', background: '#dbeafe', padding: '3px 10px', borderRadius: '12px', fontWeight: '600', whiteSpace: 'nowrap', alignSelf: 'center' }}>
-                    👩 Modo asesora
-                  </div>
+                <div style={{ padding: '10px 16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#1d4ed8', background: '#dbeafe', padding: '3px 10px', borderRadius: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>👩 Modo asesora</div>
                   <button
                     onClick={() => { setShowQRPanel((v) => !v); setShowAddQR(false); setQrFilter('') }}
-                    style={{
-                      padding: '8px 12px', borderRadius: '20px', border: '1px solid #d1fae5',
-                      background: showQRPanel ? '#d1fae5' : '#f9fafb', color: '#065f46',
-                      fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'center',
-                    }}
-                    title="Respuestas rápidas (también escribe /)"
+                    style={{ padding: '7px 12px', borderRadius: '20px', border: `1px solid ${showQRPanel ? '#075e54' : '#d1fae5'}`, background: showQRPanel ? '#d1fae5' : '#f9fafb', color: '#065f46', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                   >💬 Atajos</button>
                   <textarea
                     value={humanMessage}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setHumanMessage(val)
-                      if (val.endsWith('/') || val === '/') {
-                        setShowQRPanel(true)
-                        setQrFilter('')
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') { setShowQRPanel(false); setQrFilter('') }
-                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendHumanMessage() }
-                    }}
+                    onChange={(e) => { const val = e.target.value; setHumanMessage(val); if (val.endsWith('/') || val === '/') { setShowQRPanel(true); setQrFilter('') } }}
+                    onKeyDown={(e) => { if (e.key === 'Escape') { setShowQRPanel(false); setQrFilter('') } if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendHumanMessage() } }}
                     placeholder="Escribe tu mensaje o / para atajos... (Enter para enviar)"
                     rows={1}
-                    style={{
-                      flex: 1, padding: '10px 14px', borderRadius: '20px',
-                      border: '1px solid #e5e7eb', fontSize: '14px',
-                      resize: 'none', outline: 'none', fontFamily: 'system-ui, sans-serif',
-                      maxHeight: '80px', lineHeight: '1.4',
-                    }}
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: '1px solid #e5e7eb', fontSize: '14px', resize: 'none', outline: 'none', fontFamily: 'system-ui, sans-serif', maxHeight: '80px', lineHeight: '1.4' }}
                   />
-                  <button
-                    onClick={handleSendHumanMessage}
-                    disabled={sendingHuman || !humanMessage.trim()}
-                    style={{
-                      padding: '10px 20px', borderRadius: '20px', border: 'none',
-                      background: sendingHuman || !humanMessage.trim() ? '#9ca3af' : '#075e54',
-                      color: '#fff', fontWeight: '700', fontSize: '14px',
-                      cursor: sendingHuman || !humanMessage.trim() ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
+                  <button onClick={handleSendHumanMessage} disabled={sendingHuman || !humanMessage.trim()}
+                    style={{ padding: '10px 20px', borderRadius: '20px', border: 'none', background: sendingHuman || !humanMessage.trim() ? '#9ca3af' : '#075e54', color: '#fff', fontWeight: '700', fontSize: '14px', cursor: sendingHuman || !humanMessage.trim() ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
                     {sendingHuman ? '...' : 'Enviar'}
                   </button>
                 </div>
