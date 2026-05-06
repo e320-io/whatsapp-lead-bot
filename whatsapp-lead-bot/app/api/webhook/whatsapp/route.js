@@ -168,15 +168,27 @@ export async function POST(request) {
 
     await markAsRead(message.id).catch(function () {})
 
-    // Deduplicación: ignorar si ya procesamos este message.id de WhatsApp
+    // Deduplicación atómica: insertar lock antes de procesar.
+    // Meta envía el mismo webhook dos veces; el PRIMARY KEY en processing_locks
+    // garantiza que solo una petición lo procesa, aunque lleguen simultáneamente.
     var supabaseDedup = createSupabaseAdmin()
+    var lockResult = await supabaseDedup
+      .from('processing_locks')
+      .insert({ message_id: message.id })
+    if (lockResult.error) {
+      // Error por clave duplicada = otro request ya está procesando este mensaje
+      console.log('Mensaje duplicado ignorado (lock):', message.id, lockResult.error.code)
+      return NextResponse.json({ status: 'duplicate' })
+    }
+
+    // Seguridad secundaria: verificar en messages por si el lock no existía aún
     var dedupResult = await supabaseDedup
       .from('messages')
       .select('id')
       .eq('whatsapp_message_id', message.id)
       .limit(1)
     if (dedupResult.data && dedupResult.data.length > 0) {
-      console.log('Mensaje duplicado ignorado:', message.id)
+      console.log('Mensaje duplicado ignorado (messages):', message.id)
       return NextResponse.json({ status: 'duplicate' })
     }
 
