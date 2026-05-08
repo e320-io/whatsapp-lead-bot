@@ -7,12 +7,15 @@ const anthropic = new Anthropic({
 
 export async function generateBotResponse(_systemPrompt, messageHistory, leadInfo, branchConfig, availabilityInfo, allBranches) {
   const branchInfo = leadInfo.metadata?.sucursal
-    ? `\nSUCURSAL DEL LEAD: ${leadInfo.metadata.sucursal}${leadInfo.metadata.direccion ? ` (${leadInfo.metadata.direccion})` : ''}${leadInfo.metadata.zona ? ` - Zona: ${leadInfo.metadata.zona}` : ''}${leadInfo.metadata.maps_url ? ` | Link Maps: ${leadInfo.metadata.maps_url}` : ''}`
+    ? `\nSUCURSAL DEL LEAD: ${leadInfo.metadata.sucursal}` +
+      (leadInfo.metadata.direccion ? `\nDirección confirmada (USAR EXACTAMENTE ESTA, NO INVENTAR OTRA): ${leadInfo.metadata.direccion}` : '') +
+      (leadInfo.metadata.zona ? `\nZona: ${leadInfo.metadata.zona}` : '') +
+      (leadInfo.metadata.maps_url ? `\nLink Maps (OBLIGATORIO incluirlo al dar la dirección, en línea propia como URL pura): ${leadInfo.metadata.maps_url}` : '')
     : ''
 
   // Lista de sucursales para el system prompt (siempre disponible para contexto)
   const branchesList = allBranches?.length
-    ? '\nSUCURSALES DISPONIBLES: ' + allBranches.map(b => b.name + (b.address ? ` (${b.address})` : '')).join(' | ')
+    ? '\nSUCURSALES DISPONIBLES: ' + allBranches.map(b => b.name + (b.address ? ` — ${b.address}` : '')).join(' | ')
     : ''
 
   const fullSystemPrompt = `${SYSTEM_PROMPT}
