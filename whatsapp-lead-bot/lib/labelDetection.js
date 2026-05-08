@@ -17,7 +17,6 @@ export var LABELS = [
   { key: 'faciales',           label: 'faciales',            emoji: '🧖', color: '#DB2777' },
   { key: 'cera',               label: 'cera',                emoji: '🕯️', color: '#6D28D9' },
   { key: 'cliente_dv',         label: 'cliente DV',          emoji: '⭐', color: '#0891B2' },
-  { key: 'otra_sucursal',      label: 'otra sucursal',       emoji: '',   color: '#4C1D95' },
   { key: 'nuevo_pedido',       label: 'nuevo pedido',        emoji: '',   color: '#8B5CF6' },
 ]
 
@@ -97,11 +96,6 @@ export function detectLabel(lead, messages, branchName) {
 
   if (/dv\b|diamond|frecuente|vip/.test(allText)) {
     return 'cliente_dv'
-  }
-
-  // 5. Branch fallback (non-Polanco)
-  if (branchName) {
-    return 'otra_sucursal'
   }
 
   return 'nuevo_pedido'
