@@ -4,7 +4,7 @@ import { supabaseAdminFetch } from '@/lib/supabase'
 export async function GET() {
   try {
     const leads = await supabaseAdminFetch(
-      'leads?select=id,name,phone,stage,source,created_at,branch_id,branches(name)&order=created_at.desc&limit=200'
+      'leads?select=id,name,phone,stage,label,source,created_at,branch_id,branches(name)&order=created_at.desc&limit=200'
     )
 
     if (!Array.isArray(leads)) throw new Error(leads?.message || 'Error fetching leads')

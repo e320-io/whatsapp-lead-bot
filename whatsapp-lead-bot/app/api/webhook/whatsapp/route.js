@@ -4,6 +4,7 @@ import { sendWhatsAppMessage, sendWhatsAppImage, markAsRead } from '@/lib/whatsa
 import { generateBotResponse } from '@/lib/claude'
 import { createAppointment, getAvailableSlots, getClabeInfo, createPreventaPaquete } from '@/lib/pos'
 import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hubspot'
+import { detectLabel } from '@/lib/labelDetection'
 
 var BRANCH_WHATSAPP_NUMBERS = {
   'Valle':    '5528008869',
@@ -162,6 +163,12 @@ export async function POST(request) {
           await supabaseImg.from('messages').insert({ conversation_id: convForImg.data.id, business_id: bizForImg.data.id, role: 'bot', content: compReply })
         }
         await sendWhatsAppMessage(phoneNumber, compReply)
+        // Actualizar etiqueta según nuevo stage
+        try {
+          var finalStage = preventaResult?.success ? 'cita_agendada' : 'escalado'
+          var labelForImg = detectLabel(Object.assign({}, leadForImg.data, { stage: finalStage }), [], null)
+          await supabaseImg.from('leads').update({ label: labelForImg }).eq('id', leadForImg.data.id)
+        } catch (e) { console.error('Error actualizando etiqueta (img):', e.message) }
         return NextResponse.json({ status: 'comprobante_recibido' })
       }
 
@@ -636,6 +643,17 @@ export async function POST(request) {
     if (lead.stage === 'nuevo' && history.length > 2) {
       await supabase.from('leads').update({ stage: 'en_conversacion', updated_at: new Date().toISOString() }).eq('id', lead.id)
       if (hubspotDealId) updateDealStage(hubspotDealId, 'en_conversacion').catch((e) => console.error('HubSpot stage update:', e.message))
+    }
+
+    // 12. Detectar y guardar etiqueta automática
+    try {
+      var updatedLead = Object.assign({}, lead, { stage: lead.stage === 'nuevo' && history.length > 2 ? 'en_conversacion' : lead.stage })
+      var newLabel = detectLabel(updatedLead, history, activeBranch?.name || null)
+      if (newLabel !== lead.label) {
+        await supabase.from('leads').update({ label: newLabel }).eq('id', lead.id)
+      }
+    } catch (labelErr) {
+      console.error('Error detectando etiqueta:', labelErr.message)
     }
 
     return NextResponse.json({ status: 'ok', escalated: shouldEscalate })
