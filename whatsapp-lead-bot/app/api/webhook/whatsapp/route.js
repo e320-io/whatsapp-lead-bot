@@ -600,15 +600,17 @@ export async function POST(request) {
     if (appUrl) {
       var replyLower = botReply.toLowerCase()
       var userMsgLower = messageText.toLowerCase()
-      var bikiniKeywords = ['bikini', 'bikini básico', 'sexy bikini', 'french bikini', 'brazilian', 'zona íntima', 'zona intima']
-      var mentionsBikini = bikiniKeywords.some(function(kw) { return replyLower.includes(kw) || userMsgLower.includes(kw) })
+      // Keywords que indican que el bot ya presentó los tipos de bikini (no solo mencionó la zona)
+      var bikiniTypeKeywords = ['bikini básico', 'sexy bikini', 'french bikini', 'brazilian bikini']
+      var mentionsBikiniTypes = bikiniTypeKeywords.some(function(kw) { return replyLower.includes(kw) || userMsgLower.includes(kw) })
       var mentionsCombo = replyLower.includes('combo') || userMsgLower.includes('combo')
       // No enviar imagen de bikini si la conversación es sobre depilación con cera
       var isWaxConversation = history.some(function(m) { return (m.content || '').toLowerCase().includes('cera') })
         || messageText.toLowerCase().includes('cera')
-      if (mentionsBikini && !mentionsCombo && !isWaxConversation) {
+      if (mentionsBikiniTypes && !mentionsCombo && !isWaxConversation) {
+        // Solo bloquear si el bot ya mostró los tipos de bikini antes (no por solo mencionar la zona)
         var bikiniImageAlreadySent = history.some(function(m) {
-          return m.role === 'bot' && bikiniKeywords.some(function(kw) { return (m.content || '').toLowerCase().includes(kw) })
+          return m.role === 'bot' && bikiniTypeKeywords.some(function(kw) { return (m.content || '').toLowerCase().includes(kw) })
         })
         if (!bikiniImageAlreadySent) {
           setTimeout(async function() {
