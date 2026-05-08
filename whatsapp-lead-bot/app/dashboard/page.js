@@ -794,7 +794,9 @@ export default function Dashboard() {
                         {isBot ? (isHumanAgent ? '👩 Asesora' : '🤖 Bot') : '👤 Lead'}
                       </div>
                       <div style={{ fontSize: '14px', color: '#111827', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                        {msg.content}
+                        {/\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i.test(msg.content)
+                          ? <img src={msg.content} alt="imagen" style={{ maxWidth: '100%', borderRadius: '8px', display: 'block' }} />
+                          : msg.content}
                       </div>
                       <div style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'right', marginTop: '4px' }}>
                         {formatFullTime(msg.created_at)}

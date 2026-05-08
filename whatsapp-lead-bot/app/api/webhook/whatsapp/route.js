@@ -615,7 +615,15 @@ export async function POST(request) {
         if (!bikiniImageAlreadySent) {
           setTimeout(async function() {
             try {
-              await sendWhatsAppImage(phoneNumber, appUrl + '/images/Bikini-hotsale.jpeg')
+              const imageUrl = appUrl + '/images/Bikini-hotsale.jpeg'
+              await sendWhatsAppImage(phoneNumber, imageUrl)
+              await supabase.from('messages').insert({
+                conversation_id: conversation.id,
+                business_id: business.id,
+                role: 'bot',
+                content: imageUrl,
+                is_human_agent: false,
+              })
             } catch(e) {
               console.error('Error enviando imagen bikini:', e.message)
             }
