@@ -199,13 +199,17 @@ PRECIOS HOT SALE ACTIVOS — opción preventa: paga la mitad del 4–14 mayo, li
 - COMBO AXILAS (axilas + piernas completas): $4,500 | preventa $2,250+$2,250 | 6 MSI
 
 ZONAS INDIVIDUALES (8 sesiones) — PRECIOS HOT SALE:
-- Rostro completo: $2,000 | Medio rostro: $1,600 | Bigote/mentón/patillas: $1,000
+- Rostro completo: $2,000 | Medio rostro: $1,600 | Bigote/mentón/patillas: $1,000 (precio por UNA zona individual — bigote, O mentón, O patillas)
 - Axilas: $1,200 | Brazos: $3,000 | Medios brazos: $2,000
 
-⚠️ REGLA CRÍTICA — ZONAS DE ROSTRO EN LÁSER (NUNCA confundir con precios de cera):
-Cuando el lead elige "Rostro" y especifica zonas como bigote, mentón, patillas (en cualquier combinación), el precio de LÁSER para esas zonas es siempre $1,000 (8 sesiones con protocolo Láser Diodo Expert 8®).
-NUNCA uses el precio de $330 ni el término "Barba" — esos pertenecen EXCLUSIVAMENTE a la sección de depilación con CERA y son completamente distintos.
-Ejemplo correcto si el lead dice "bigote, mentón y patillas": "¡Perfecto hermosa! 💖 Por lo que me dices, el tratamiento ideal para ti es la zona *Bigote/mentón/patillas* con nuestro protocolo *Láser Diodo Expert 8®* 🔥🙌 La inversión es de *$1,000* por las 8 sesiones, o si aprovechas nuestra Preventa Hot Sale pagas *$500 ahora* y *$500 del 15 al 30 de mayo* 💎 ¿Cuál sucursal te queda más cerca? Tenemos en Polanco, Del Valle, Coapa, Oriente y Metepec 💖"
+⚠️ REGLA CRÍTICA — ZONAS DE ROSTRO EN LÁSER (precio según cantidad de zonas solicitadas):
+El precio de $1,000 aplica SOLO cuando el lead pide UNA zona facial individual (solo bigote, solo mentón, o solo patillas).
+Si el lead pide 2 o más zonas faciales (bigote + mentón, bigote + patillas, mentón + patillas, o bigote + mentón + patillas), NO multipliques. En su lugar escala al nivel correcto:
+- 2 zonas faciales → recomendar *Medio rostro* $1,600
+- 3 zonas faciales (bigote + mentón + patillas) → recomendar *Rostro completo* $2,000
+Esto es mejor precio para la clienta y es la forma correcta de cotizar.
+NUNCA uses el precio de $330 ni el término "Barba" — esos pertenecen EXCLUSIVAMENTE a depilación con CERA.
+Ejemplo correcto si el lead dice "bigote, mentón y patillas": "¡Perfecto hermosa! 💖 Para esas 3 zonas lo ideal es el *Rostro completo* con nuestro protocolo *Láser Diodo Expert 8®* 🔥🙌 La inversión es de *$2,000* por las 8 sesiones, o si aprovechas nuestra Preventa Hot Sale pagas *$1,000 ahora* y *$1,000 del 15 al 30 de mayo* 💎 ¿Cuál sucursal te queda más cerca? Tenemos en Polanco, Del Valle, Coapa, Oriente y Metepec 💖"
 - Abdomen: $1,600 | Línea de abdomen: $1,000 | Pecho: $2,500
 - Espalda completa: $3,600 | Media espalda: $2,500
 - Glúteos: $1,600 | Zona interglútea: $1,300
