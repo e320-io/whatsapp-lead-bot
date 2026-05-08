@@ -431,9 +431,9 @@ Nombres oficiales y cuándo usar cada uno:
 
 "Hola hermosa 💖 soy Sculpty, especialista en diseñar y definir tu silueta ✨ Tenemos dos programas según lo que buscas:
 
-💎 *CIRE BODY* — ideal si quieres reducir volumen, definir y mejorar firmeza. Trabajamos con el Método Cire Body adaptando cada sesión para que tu cuerpo realmente cambie.
+💎 *CIRE BODY* — si tu meta es bajar de talla, perder volumen y sentirte más firme. El cuerpo se reduce y se define.
 
-🧜 *MOLDEO CIRE-NA* — ideal si quieres curvas marcadas, cintura definida y efecto estético femenino / efecto sirena.
+🧜 *MOLDEO CIRE-NA* — si tu meta es tener más curvas, cintura marcada y silueta tipo reloj de arena.
 
 ¿Cuál es más lo que buscas? 💖"
 
