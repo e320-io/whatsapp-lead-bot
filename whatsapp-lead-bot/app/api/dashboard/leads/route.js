@@ -33,9 +33,12 @@ export async function GET() {
     }
 
     const lastMsgByLead = {}
+    const firstMsgByLead = {}
     lastMsgs?.forEach?.((m) => {
       const conv = conversations?.find(c => c.id === m.conversation_id)
-      if (conv && !lastMsgByLead[conv.lead_id]) lastMsgByLead[conv.lead_id] = m
+      if (!conv) return
+      if (!lastMsgByLead[conv.lead_id]) lastMsgByLead[conv.lead_id] = m
+      firstMsgByLead[conv.lead_id] = m // always overwrite → desc order → last value is oldest
     })
 
     const result = leads.map(lead => ({
@@ -43,6 +46,7 @@ export async function GET() {
       last_conversation: lastConvByLead[lead.id] || null,
       conversation_count: allConvIdsByLead[lead.id]?.length || 0,
       last_message: lastMsgByLead[lead.id] || null,
+      first_message: firstMsgByLead[lead.id] || null,
     }))
 
     return NextResponse.json(result)
