@@ -603,7 +603,10 @@ export async function POST(request) {
       var bikiniKeywords = ['bikini', 'bikini básico', 'sexy bikini', 'french bikini', 'brazilian', 'zona íntima', 'zona intima']
       var mentionsBikini = bikiniKeywords.some(function(kw) { return replyLower.includes(kw) || userMsgLower.includes(kw) })
       var mentionsCombo = replyLower.includes('combo') || userMsgLower.includes('combo')
-      if (mentionsBikini && !mentionsCombo) {
+      // No enviar imagen de bikini si la conversación es sobre depilación con cera
+      var isWaxConversation = history.some(function(m) { return (m.content || '').toLowerCase().includes('cera') })
+        || messageText.toLowerCase().includes('cera')
+      if (mentionsBikini && !mentionsCombo && !isWaxConversation) {
         var bikiniImageAlreadySent = history.some(function(m) {
           return m.role === 'bot' && bikiniKeywords.some(function(kw) { return (m.content || '').toLowerCase().includes(kw) })
         })
