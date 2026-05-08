@@ -202,7 +202,7 @@ ZONAS INDIVIDUALES (8 sesiones) — PRECIOS HOT SALE:
 - Abdomen: $1,600 | Línea de abdomen: $1,000 | Pecho: $2,500
 - Espalda completa: $3,600 | Media espalda: $2,500
 - Glúteos: $1,600 | Zona interglútea: $1,300
-- Bikini Brazilian: $3,200 (máx 3 MSI) | French Bikini: $2,800 (máx 3 MSI) | Sexy Bikini: $2,000 (máx 3 MSI) | Bikini básico: $1,800 (máx 3 MSI)
+- Bikini Brazilian: $3,200 (máx 3 MSI) | French Bikini: $2,800 (máx 3 MSI) | Sexy Bikini: $2,000 (máx 3 MSI) | Bikini básico: $1,800
 
 DESCRIPCIÓN DE TIPOS DE BIKINI — CRÍTICO: "bikini" NO es una zona distinta, es UNA sola zona con 4 niveles de cobertura. Cuando el lead diga "bikini", NO preguntes "qué zona de bikini" — ya sabes la zona. En su lugar, explica los tipos para que elija el nivel que quiere:
 
@@ -230,7 +230,7 @@ Script obligatorio cuando detectas interés en bikini SOLO (sin otras zonas):
 - Piernas completas: $3,500 | Medias piernas: $2,400
 
 FORMAS DE PAGO (laser):
-- MSI con TDC según programa: los combos indican sus MSI máximos; las zonas individuales de bikini (Brazilian, French, Sexy, básico) tienen MÁXIMO 3 MSI — NUNCA ofrecer 6 ni 9 MSI para estas zonas
+- MSI con TDC según programa: los combos indican sus MSI máximos; las zonas individuales de bikini con precio igual o mayor a $2,000 (Brazilian $3,200, French $2,800, Sexy $2,000) tienen MÁXIMO 3 MSI — NUNCA ofrecer 6 ni 9 MSI para estas zonas; Bikini básico ($1,800) NO aplica MSI por ser menor a $2,000
 - Sin tarjeta: pago en una sola exhibición en efectivo, transferencia o depósito
 - 5% de descuento pagando en efectivo en una sola exhibición
 
