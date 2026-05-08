@@ -65,6 +65,8 @@ export default function Dashboard() {
   const [showAddQR, setShowAddQR] = useState(false)
   const [newQR, setNewQR] = useState({ shortcut: '', content: '' })
   const [savingQR, setSavingQR] = useState(false)
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const fileInputRef = useRef(null)
 
   const PRESET_IMAGES = [
     { label: '👙 Bikini Hot Sale', file: 'Bikini-hotsale.jpeg' },
@@ -344,6 +346,36 @@ export default function Dashboard() {
       alert('Error: ' + e.message)
     } finally {
       setSendingImage(false)
+    }
+  }
+
+  async function handleAttachImage(e) {
+    const file = e.target.files?.[0]
+    if (!file || !selected || !activeConv) return
+    e.target.value = ''
+    setUploadingAttachment(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const uploadRes = await fetch('/api/dashboard/upload-image', { method: 'POST', body: form })
+      const uploadData = await uploadRes.json()
+      if (!uploadData.success) throw new Error(uploadData.error || 'Error al subir imagen')
+
+      const sendRes = await fetch('/api/dashboard/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: selected.id, conversationId: activeConv.id, imageUrl: uploadData.url }),
+      })
+      const sendData = await sendRes.json()
+      if (sendData.success) {
+        await fetchMessages(selected.id)
+      } else {
+        alert('Error al enviar imagen: ' + (sendData.error || 'Intenta de nuevo'))
+      }
+    } catch (err) {
+      alert('Error: ' + err.message)
+    } finally {
+      setUploadingAttachment(false)
     }
   }
 
@@ -871,6 +903,19 @@ export default function Dashboard() {
                     onClick={() => { setShowQRPanel((v) => !v); setShowAddQR(false); setQrFilter('') }}
                     style={{ padding: '7px 12px', borderRadius: '20px', border: `1px solid ${showQRPanel ? '#075e54' : '#d1fae5'}`, background: showQRPanel ? '#d1fae5' : '#f9fafb', color: '#065f46', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                   >💬 Atajos</button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleAttachImage}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAttachment}
+                    title="Adjuntar imagen"
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #d1d5db', background: uploadingAttachment ? '#f3f4f6' : '#fff', color: '#6b7280', fontSize: '20px', lineHeight: '1', cursor: uploadingAttachment ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                  >{uploadingAttachment ? '⏳' : '+'}</button>
                   <textarea
                     value={humanMessage}
                     onChange={(e) => { const val = e.target.value; setHumanMessage(val); if (val.endsWith('/') || val === '/') { setShowQRPanel(true); setQrFilter('') } }}
