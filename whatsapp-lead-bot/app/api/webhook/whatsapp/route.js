@@ -11,7 +11,7 @@ var BRANCH_WHATSAPP_NUMBERS = {
   'Coapa':    '5630399230',
   'Oriente':  '5547681165',
   'Polanco':  '5523432589',
-  'Metepec':  '7291766576',
+  'Metepec':  '527291766576',
 }
 
 var MAPS_POR_SUCURSAL = {
