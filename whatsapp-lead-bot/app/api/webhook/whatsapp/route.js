@@ -366,6 +366,22 @@ export async function POST(request) {
     var historyResult = await supabase.from('messages').select('role, content').eq('conversation_id', conversation.id).order('created_at', { ascending: false }).limit(10)
     var history = (historyResult.data || []).reverse()
 
+    // 5b. Debounce: si el lead mandó varios mensajes seguidos sin que el bot haya respondido,
+    // solo contestar al último para evitar respuestas dobles.
+    // Contar mensajes consecutivos del lead al final del historial (desde la última respuesta del bot).
+    var tailLeadCount = 0
+    for (var i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === 'lead') {
+        tailLeadCount++
+      } else {
+        break
+      }
+    }
+    if (tailLeadCount > 1) {
+      console.log('Debounce: ' + tailLeadCount + ' mensajes consecutivos del lead sin respuesta del bot — omitiendo respuesta para', phoneNumber)
+      return NextResponse.json({ status: 'debounced' })
+    }
+
     // 6. Consultar disponibilidad si quiere agendar
     var lowerMsg = savedMessageContent.toLowerCase()
     var bookingWords = ['agendar', 'cita', 'horario', 'disponibilidad', 'día', 'mañana', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'agenda', 'cuando', 'cuándo', 'puedo ir', 'hay lugar', 'tienen espacio', 'quiero ir', 'sesión', 'sesion']
