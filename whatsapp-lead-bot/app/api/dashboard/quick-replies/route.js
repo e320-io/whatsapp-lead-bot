@@ -16,7 +16,7 @@ export async function GET() {
     const supabase = createSupabaseAdmin()
     const { data, error } = await supabase
       .from('quick_replies')
-      .select('id, shortcut, content, created_at')
+      .select('id, shortcut, content, image_url, created_at')
       .order('shortcut', { ascending: true })
     if (error) throw error
     return NextResponse.json(data, { headers: CORS })
@@ -27,14 +27,18 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const { shortcut, content } = await request.json()
-    if (!shortcut?.trim() || !content?.trim()) {
-      return NextResponse.json({ error: 'shortcut y content son requeridos' }, { status: 400, headers: CORS })
+    const { shortcut, content, image_url } = await request.json()
+    if (!shortcut?.trim() || (!content?.trim() && !image_url)) {
+      return NextResponse.json({ error: 'shortcut y content o image_url son requeridos' }, { status: 400, headers: CORS })
     }
     const supabase = createSupabaseAdmin()
     const { data, error } = await supabase
       .from('quick_replies')
-      .insert({ shortcut: shortcut.trim().toLowerCase().replace(/\s+/g, ''), content: content.trim() })
+      .insert({
+        shortcut: shortcut.trim().toLowerCase().replace(/\s+/g, ''),
+        content: content?.trim() || null,
+        image_url: image_url || null,
+      })
       .select()
       .single()
     if (error) throw error
