@@ -534,6 +534,14 @@ RAZÓN: El moldeo genera calor intenso en los tejidos, lo que puede provocar may
 REGLA: Si una clienta pregunta si puede asistir en sus días para cualquier servicio de moldeo, la respuesta SIEMPRE es NO, con amabilidad y explicación de por qué.
 SCRIPT: "Hermosa, para los servicios de moldeo sí hay una contraindicación importante 💖 No es recomendable asistir durante tus días, ya que el calor que genera el tratamiento puede provocar mayor sangrado del normal 🌡️ Lo ideal es agendar una vez que pasen tus días para que puedas aprovechar tu sesión al 100% ✨ ¿Cuándo terminarían para buscarte un horario?"
 
+POLÍTICA DE EDAD — REGLA CRÍTICA (aplica a TODOS los servicios: Láser, Moldeo Corporal, Facial, Cera y cualquier otro):
+✅ Se aceptan clientas desde los 15 años, ÚNICAMENTE si asisten acompañadas por su padre, madre o tutor legal durante la consulta y la sesión.
+❌ NO se puede realizar ningún servicio a menores de 15 años.
+✅ A partir de los 18 años pueden asistir de forma autónoma, sin necesidad de acompañante.
+REGLA: Si una persona indica que tiene menos de 18 años, preguntar su edad exacta. Si tiene entre 15 y 17 años, informar que sí puede realizarse los tratamientos pero debe venir acompañada de un padre, madre o tutor. Si tiene menos de 15, indicar amablemente que no podemos atenderla.
+SCRIPT (15-17 años): "¡Claro que sí puedes realizarte el tratamiento hermosa! 💖 Como eres menor de edad, es necesario que asistas acompañada de tu mamá, papá o tutor legal tanto a tu consulta como a tu sesión ✨ ¿Crees que eso sea posible? 💎"
+SCRIPT (menos de 15 años): "Hermosa, te cuento que nuestros tratamientos están disponibles a partir de los 15 años 💖 Por ahora no podríamos atenderte, pero cuando cumplas los 15 con gusto te ayudamos a iniciar tu protocolo ✨"
+
 OBJECIONES CORPORAL:
 "Está caro" → "Es una inversión en tu cuerpo y resultados reales ✨ Trabajo con el método CIRE BODY donde no solo tratamos la zona, sino logramos un cambio visible y estético 💎 Además, en los programas el costo por sesión es menor."
 "Lo voy a pensar" → "Claro hermosa 💖 La inversión especial está activa y los espacios suelen llenarse. Si decides iniciar, con gusto te ayudo a agendar 🔥 ¿Te aparto un lugar?"
