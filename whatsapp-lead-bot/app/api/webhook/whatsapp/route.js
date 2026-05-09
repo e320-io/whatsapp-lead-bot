@@ -428,10 +428,11 @@ export async function POST(request) {
           var summaryLines = history.slice(-10).map(function(m) {
             return (m.role === 'lead' ? '👤 Lead' : '🤖 Bot') + ': ' + m.content
           })
-          var notifMsg = '🔔 *Lead quiere agendar — CIRE ' + activeBranch.name + '*\n\n'
+          var notifMsg = '📍 *SUCURSAL ' + activeBranch.name.toUpperCase() + '* 📍\n'
+            + '━━━━━━━━━━━━━━━━━━━━━━\n'
+            + '🔔 *Lead listo para agendar*\n\n'
             + '👤 *Nombre:* ' + (lead.name || 'No proporcionado') + '\n'
-            + '📱 *WhatsApp:* ' + phoneNumber + '\n'
-            + '🏢 *Sucursal de interés:* ' + activeBranch.name + '\n\n'
+            + '📱 *WhatsApp:* ' + phoneNumber + '\n\n'
             + '📋 *Contexto de la conversación:*\n' + summaryLines.join('\n')
 
           await sendWhatsAppMessage(branchWaPhone, notifMsg)
