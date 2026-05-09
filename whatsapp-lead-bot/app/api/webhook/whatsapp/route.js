@@ -93,6 +93,17 @@ export async function POST(request) {
     var messageText = message.text?.body || ''
     var businessPhoneId = value.metadata?.phone_number_id || null
 
+    // Ignorar mensajes enviados desde números de sucursales para evitar que el bot
+    // intente calificarlos como leads
+    var branchNumbers = new Set(Object.values(BRANCH_WHATSAPP_NUMBERS))
+    var normalizedIncoming = phoneNumber.startsWith('521') && phoneNumber.length === 13
+      ? '52' + phoneNumber.slice(3)
+      : phoneNumber
+    if (branchNumbers.has(normalizedIncoming)) {
+      console.log('Mensaje de número de sucursal ignorado:', phoneNumber)
+      return NextResponse.json({ status: 'branch_number_ignored' })
+    }
+
     // Manejar imagen/documento de comprobante para leads en anticipo_pendiente
     if (message.type === 'image' || message.type === 'document') {
       var supabaseImg = createSupabaseAdmin()
