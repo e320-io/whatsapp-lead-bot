@@ -367,10 +367,9 @@ export async function POST(request) {
       conversation = newConvResult.data
     }
 
-    // 4. Guardar mensaje (sin la keyword de sucursal si fue detectada)
-    var savedMessageContent = cleanedMessageText || messageText
+    // 4. Guardar mensaje — siempre el texto original completo
     await supabase.from('messages').insert({
-      conversation_id: conversation.id, business_id: business.id, role: 'lead', content: savedMessageContent,
+      conversation_id: conversation.id, business_id: business.id, role: 'lead', content: messageText,
       whatsapp_message_id: message.id
     })
 
@@ -401,12 +400,12 @@ export async function POST(request) {
     }
 
     // 6. Consultar disponibilidad si quiere agendar
-    var lowerMsg = savedMessageContent.toLowerCase()
+    var lowerMsg = messageText.toLowerCase()
     var bookingWords = ['agendar', 'cita', 'horario', 'disponibilidad', 'día', 'mañana', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'agenda', 'cuando', 'cuándo', 'puedo ir', 'hay lugar', 'tienen espacio', 'quiero ir', 'sesión', 'sesion']
     var wantsToBook = bookingWords.some(function (kw) { return lowerMsg.includes(kw) })
 
     // Si el mensaje es corto (confirmación como "sip", "ok", "dale"), revisar si el historial reciente tiene contexto de agendamiento
-    if (!wantsToBook && savedMessageContent.length < 30) {
+    if (!wantsToBook && messageText.length < 30) {
       var recentBotMessages = history.filter(function (m) { return m.role === 'bot' }).slice(-3)
       var botBookingContext = recentBotMessages.some(function (m) {
         var c = (m.content || '').toLowerCase()
