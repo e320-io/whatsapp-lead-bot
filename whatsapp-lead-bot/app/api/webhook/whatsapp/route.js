@@ -7,10 +7,10 @@ import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hu
 import { detectLabel } from '@/lib/labelDetection'
 
 var BRANCH_WHATSAPP_NUMBERS = {
-  'Valle':    '5528008869',
-  'Coapa':    '5630399230',
-  'Oriente':  '5547681165',
-  'Polanco':  '5523432589',
+  'Valle':    '525528008869',
+  'Coapa':    '525630399230',
+  'Oriente':  '525528008869',
+  'Polanco':  '525528008869',
   'Metepec':  '527291766576',
 }
 
