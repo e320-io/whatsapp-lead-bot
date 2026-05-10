@@ -113,6 +113,58 @@ export async function sendWhatsAppImage(to, imageUrl, caption = '') {
 }
 
 /**
+ * Descarga un archivo multimedia de WhatsApp y lo sube a Supabase Storage.
+ * Devuelve la URL pública o null si falla.
+ * @param {string} mediaId - ID del media en WhatsApp
+ * @param {string} mimeType - MIME type del archivo (image/jpeg, application/pdf, etc.)
+ * @param {object} supabase - Cliente de Supabase admin
+ */
+export async function downloadAndStoreWhatsAppMedia(mediaId, mimeType, supabase) {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+
+  try {
+    // 1. Obtener la URL de descarga autenticada desde Meta
+    const metaRes = await fetch(`${GRAPH_API_URL}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!metaRes.ok) throw new Error('No se pudo obtener URL del media: ' + metaRes.status)
+    const metaData = await metaRes.json()
+    const downloadUrl = metaData.url
+    if (!downloadUrl) throw new Error('Meta no devolvió URL de descarga')
+
+    // 2. Descargar los bytes del archivo
+    const fileRes = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!fileRes.ok) throw new Error('No se pudo descargar el archivo: ' + fileRes.status)
+    const arrayBuffer = await fileRes.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    // 3. Determinar extensión
+    const extMap = {
+      'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+      'image/webp': 'webp', 'application/pdf': 'pdf',
+    }
+    const ext = extMap[mimeType] || 'bin'
+    const fileName = `comprobantes/${Date.now()}_${mediaId}.${ext}`
+
+    // 4. Subir a Supabase Storage (bucket: chat-images)
+    const { error: uploadError } = await supabase.storage
+      .from('chat-images')
+      .upload(fileName, buffer, { contentType: mimeType, upsert: false })
+
+    if (uploadError) throw new Error('Error subiendo a Supabase Storage: ' + uploadError.message)
+
+    // 5. Obtener URL pública
+    const { data: urlData } = supabase.storage.from('chat-images').getPublicUrl(fileName)
+    return urlData?.publicUrl || null
+  } catch (err) {
+    console.error('Error en downloadAndStoreWhatsAppMedia:', err.message)
+    return null
+  }
+}
+
+/**
  * Marcar mensaje como leído
  * @param {string} messageId - ID del mensaje a marcar
  */

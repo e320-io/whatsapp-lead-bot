@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
-import { sendWhatsAppMessage, sendWhatsAppImage, markAsRead } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, sendWhatsAppImage, markAsRead, downloadAndStoreWhatsAppMedia } from '@/lib/whatsapp'
 import { generateBotResponse } from '@/lib/claude'
 import { createAppointment, getAvailableSlots, getClabeInfo, createPreventaPaquete } from '@/lib/pos'
 import { findOrCreateContact, findOrCreateDeal, updateDealStage } from '@/lib/hubspot'
@@ -117,6 +117,15 @@ export async function POST(request) {
         : { data: null }
 
       if (leadForImg.data?.stage === 'anticipo_pendiente') {
+        // Descargar imagen/documento de WhatsApp y subirla a Supabase Storage
+        var mediaId = message.image?.id || message.document?.id
+        var mimeType = message.image?.mime_type || message.document?.mime_type || 'image/jpeg'
+        var publicMediaUrl = null
+        if (mediaId) {
+          publicMediaUrl = await downloadAndStoreWhatsAppMedia(mediaId, mimeType, supabaseImg)
+          if (!publicMediaUrl) console.warn('No se pudo almacenar el comprobante, mediaId:', mediaId)
+        }
+
         // Buscar el pending_appointment para saber si es preventa
         var pendingForImg = await supabaseImg.from('pending_appointments')
           .select('*').eq('lead_id', leadForImg.data.id).eq('status', 'pendiente').single()
@@ -126,14 +135,14 @@ export async function POST(request) {
           .eq('lead_id', leadForImg.data.id)
           .eq('status', 'pendiente')
 
-        // Guardar mensaje de comprobante
+        // Guardar mensaje de comprobante con URL pública si se obtuvo
         var convForImg = await supabaseImg.from('conversations').select('id').eq('lead_id', leadForImg.data.id).eq('status', 'activa').order('created_at', { ascending: false }).limit(1).single()
         if (convForImg.data) {
           await supabaseImg.from('messages').insert({
             conversation_id: convForImg.data.id,
             business_id: bizForImg.data.id,
             role: 'lead',
-            content: '[Comprobante de transferencia recibido]',
+            content: publicMediaUrl || '[Comprobante de transferencia recibido]',
             whatsapp_message_id: message.id,
           })
         }
