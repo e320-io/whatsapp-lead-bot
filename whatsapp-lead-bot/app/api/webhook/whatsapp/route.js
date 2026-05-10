@@ -528,6 +528,7 @@ export async function POST(request) {
 
       await supabase.from('pending_appointments').insert(pendingData)
       await supabase.from('leads').update({ stage: 'anticipo_pendiente', updated_at: new Date().toISOString() }).eq('id', lead.id)
+      await supabase.from('conversations').update({ bot_paused: true }).eq('id', conversation.id)
 
       botReply = botReply.replace(/\[SOLICITAR_ANTICIPO\|[^\]]+\]/g, '').trim()
 
@@ -573,6 +574,7 @@ export async function POST(request) {
 
       await supabase.from('pending_appointments').insert(pendingPreventaData)
       await supabase.from('leads').update({ stage: 'anticipo_pendiente', updated_at: new Date().toISOString() }).eq('id', lead.id)
+      await supabase.from('conversations').update({ bot_paused: true }).eq('id', conversation.id)
 
       botReply = botReply.replace(/\[SOLICITAR_PREVENTA\|[^\]]+\]/g, '').trim()
 
