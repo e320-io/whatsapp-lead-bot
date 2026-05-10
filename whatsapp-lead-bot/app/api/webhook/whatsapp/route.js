@@ -104,29 +104,44 @@ export async function POST(request) {
       return NextResponse.json({ status: 'branch_number_ignored' })
     }
 
-    // Manejar imagen/documento de comprobante para leads en anticipo_pendiente
+    // Manejar imagen/documento — siempre descargar y guardar, independientemente de la etapa
     if (message.type === 'image' || message.type === 'document') {
       var supabaseImg = createSupabaseAdmin()
       var dedupImg = await supabaseImg.from('messages').select('id').eq('whatsapp_message_id', message.id).limit(1)
       if (dedupImg.data?.length > 0) return NextResponse.json({ status: 'duplicate' })
 
-      // Buscar lead
+      // Buscar negocio y lead
       var bizForImg = await supabaseImg.from('businesses').select('*').limit(1).single()
       var leadForImg = bizForImg.data
         ? await supabaseImg.from('leads').select('*').eq('business_id', bizForImg.data.id).eq('phone', phoneNumber).single()
         : { data: null }
 
-      if (leadForImg.data?.stage === 'anticipo_pendiente') {
-        // Descargar imagen/documento de WhatsApp y subirla a Supabase Storage
-        var mediaId = message.image?.id || message.document?.id
-        var mimeType = message.image?.mime_type || message.document?.mime_type || 'image/jpeg'
-        var publicMediaUrl = null
-        if (mediaId) {
-          publicMediaUrl = await downloadAndStoreWhatsAppMedia(mediaId, mimeType, supabaseImg)
-          if (!publicMediaUrl) console.warn('No se pudo almacenar el comprobante, mediaId:', mediaId)
-        }
+      // Descargar y subir a Supabase Storage siempre
+      var mediaId = message.image?.id || message.document?.id
+      var mimeType = message.image?.mime_type || message.document?.mime_type || 'image/jpeg'
+      var publicMediaUrl = null
+      if (mediaId) {
+        publicMediaUrl = await downloadAndStoreWhatsAppMedia(mediaId, mimeType, supabaseImg)
+        if (!publicMediaUrl) console.warn('No se pudo almacenar media, mediaId:', mediaId)
+      }
 
-        // Buscar el pending_appointment para saber si es preventa
+      // Guardar en la conversación activa siempre
+      var convForImg = leadForImg.data
+        ? await supabaseImg.from('conversations').select('id').eq('lead_id', leadForImg.data.id).eq('status', 'activa').order('created_at', { ascending: false }).limit(1).single()
+        : { data: null }
+
+      if (convForImg.data && bizForImg.data) {
+        await supabaseImg.from('messages').insert({
+          conversation_id: convForImg.data.id,
+          business_id: bizForImg.data.id,
+          role: 'lead',
+          content: publicMediaUrl || '[Imagen recibida]',
+          whatsapp_message_id: message.id,
+        })
+      }
+
+      // Si el lead está en anticipo_pendiente, procesar el comprobante
+      if (leadForImg.data?.stage === 'anticipo_pendiente') {
         var pendingForImg = await supabaseImg.from('pending_appointments')
           .select('*').eq('lead_id', leadForImg.data.id).eq('status', 'pendiente').single()
 
@@ -135,20 +150,7 @@ export async function POST(request) {
           .eq('lead_id', leadForImg.data.id)
           .eq('status', 'pendiente')
 
-        // Guardar mensaje de comprobante con URL pública si se obtuvo
-        var convForImg = await supabaseImg.from('conversations').select('id').eq('lead_id', leadForImg.data.id).eq('status', 'activa').order('created_at', { ascending: false }).limit(1).single()
-        if (convForImg.data) {
-          await supabaseImg.from('messages').insert({
-            conversation_id: convForImg.data.id,
-            business_id: bizForImg.data.id,
-            role: 'lead',
-            content: publicMediaUrl || '[Comprobante de transferencia recibido]',
-            whatsapp_message_id: message.id,
-          })
-        }
-
         var compReply
-        // Si es preventa: crear paquete+cita directamente al recibir comprobante
         if (pendingForImg.data?.es_preventa && pendingForImg.data?.precio_total) {
           var pd = pendingForImg.data
           var preventaResult = await createPreventaPaquete({
@@ -173,7 +175,6 @@ export async function POST(request) {
             compReply = '¡Recibimos tu comprobante! ✨ En breve una asesora te confirma tu lugar 💖'
           }
         } else {
-          // Flujo regular: escalar para verificación manual
           await supabaseImg.from('conversations').update({ status: 'escalada', escalated_at: new Date().toISOString() }).eq('id', convForImg.data?.id)
           await supabaseImg.from('leads').update({ stage: 'escalado', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
           compReply = '¡Recibimos tu comprobante! ✨ En breve una de nuestras asesoras lo verifica y te confirma tu cita 💖 Gracias por tu paciencia hermosa.'
@@ -183,7 +184,6 @@ export async function POST(request) {
           await supabaseImg.from('messages').insert({ conversation_id: convForImg.data.id, business_id: bizForImg.data.id, role: 'bot', content: compReply })
         }
         await sendWhatsAppMessage(phoneNumber, compReply)
-        // Actualizar etiqueta según nuevo stage
         try {
           var finalStage = preventaResult?.success ? 'cita_agendada' : 'escalado'
           var labelForImg = detectLabel(Object.assign({}, leadForImg.data, { stage: finalStage }), [], null)
@@ -192,8 +192,9 @@ export async function POST(request) {
         return NextResponse.json({ status: 'comprobante_recibido' })
       }
 
-      await sendWhatsAppMessage(phoneNumber, 'Por el momento solo puedo leer mensajes de texto. ¿Podrías escribirme tu consulta? 😊')
-      return NextResponse.json({ status: 'non_text_handled' })
+      // Para cualquier otra etapa: solo confirmar recepción
+      await sendWhatsAppMessage(phoneNumber, '¡Recibí tu imagen! 📸 Si tienes alguna pregunta sobre nuestros servicios, con gusto te ayudo 💖')
+      return NextResponse.json({ status: 'image_saved' })
     }
 
     if (message.type !== 'text') {
