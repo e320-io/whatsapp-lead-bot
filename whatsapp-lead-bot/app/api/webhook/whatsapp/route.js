@@ -438,12 +438,12 @@ export async function POST(request) {
           await supabase.from('leads').update({ stage: 'notificacion_sucursal', updated_at: new Date().toISOString() }).eq('id', lead.id)
           console.log('Notificación de agendamiento enviada a sucursal ' + activeBranch.name + ' (' + branchWaPhone + ')')
 
-          availabilityInfo = '\n\nNOTIFICACIÓN ENVIADA: Ya le avisaste al equipo de CIRE ' + activeBranch.name + ' que este lead quiere agendar. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios ni disponibilidad — los horarios los coordina el equipo de la sucursal directamente. Dile al lead algo como: "¡Listo! 💖 Ya le avisé a nuestro equipo en CIRE ' + activeBranch.name + ' que quieres agendar ✨ En breve te contactan para coordinar tu horario 🙌"'
+          availabilityInfo = '\n\nNOTIFICACIÓN ENVIADA: Ya le avisaste al equipo de CIRE ' + activeBranch.name + ' que este lead quiere agendar. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios ni disponibilidad — los horarios los coordina el equipo de la sucursal directamente. Dile al lead algo como: "¡Listo! 💖 Ya le avisé a nuestro equipo en CIRE ' + activeBranch.name + ' que quieres agendar ✨ En breve te escriben por aquí para coordinar tu horario 🙌" NUNCA digas que te llamarán o marcarán.'
         } catch (err) {
           console.error('Error enviando notificación a sucursal:', err)
         }
       } else {
-        availabilityInfo = '\n\nNOTIFICACIÓN YA ENVIADA ANTERIORMENTE: El equipo de CIRE ' + activeBranch.name + ' ya fue notificado sobre este lead. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios. Recuérdale al lead que pronto le contactarán para coordinar el horario.'
+        availabilityInfo = '\n\nNOTIFICACIÓN YA ENVIADA ANTERIORMENTE: El equipo de CIRE ' + activeBranch.name + ' ya fue notificado sobre este lead. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios. Recuérdale al lead que pronto le escribirán por WhatsApp para coordinar el horario. NUNCA digas que le llamarán o marcarán.'
       }
     }
 
@@ -473,6 +473,34 @@ export async function POST(request) {
     var botReply = botResult.text
     var shouldEscalate = botResult.shouldEscalate
 
+    // Sanitizar: eliminar cualquier dato bancario que Claude haya generado en el texto
+    // (CLABE 18 dígitos, cuentas 10-11 dígitos en contexto bancario, keywords de banco)
+    var bankDataPatterns = [
+      // CLABE interbancaria: exactamente 18 dígitos
+      /\b\d{18}\b/g,
+      // "Cuenta:" o "No. Cuenta" seguido de dígitos
+      /(cuenta[:\s*]+)\d[\d\s]{8,}/gi,
+      // "CLABE:" seguido de dígitos
+      /(clabe[:\s*]+)\d[\d\s]{10,}/gi,
+      // "Tarjeta:" seguido de dígitos
+      /(tarjeta[:\s*]+)\d[\d\s]{12,}/gi,
+      // Titular con nombres conocidos de cuentas bancarias de CIRE
+      /\b(Cire Depilación Sas de CV|Fabiola Tinoco Vazquez|Marcela López Gallardo|Miguel Ángel Conde Alejandri)\b/gi,
+    ]
+    var hadBankData = false
+    for (var bp of bankDataPatterns) {
+      if (botReply.search(bp) !== -1) {
+        hadBankData = true
+        botReply = botReply.replace(bp, '***')
+      }
+    }
+    if (hadBankData) {
+      console.warn('⚠️ ALERTA: Claude intentó enviar datos bancarios en el mensaje — bloqueado y sanitizado. Lead:', phoneNumber)
+      // Reemplazar líneas con *** por un mensaje genérico
+      botReply = botReply.replace(/[^\n]*\*\*\*[^\n]*/g, '').replace(/\n{3,}/g, '\n\n').trim()
+      botReply += '\n\nEn un momento te mando los datos para la transferencia 📲'
+    }
+
     // 8a. Detectar solicitud de anticipo
     var anticipoMatch = botReply.match(/\[SOLICITAR_ANTICIPO\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
     if (anticipoMatch) {
@@ -484,7 +512,7 @@ export async function POST(request) {
         fecha: anticipoMatch[1].trim(),
         hora: anticipoMatch[2].trim(),
         sucursal: activeBranch?.name || null,
-        monto_anticipo: 200,
+        monto_anticipo: 250,
         status: 'pendiente',
       }
 
@@ -503,7 +531,7 @@ export async function POST(request) {
           + '🔢 No. Cuenta: ' + clabeInfo.cuenta + '\n'
           + '🔢 CLABE: ' + clabeInfo.clabe + '\n'
           + (clabeInfo.tarjeta ? '💳 No. Tarjeta: ' + clabeInfo.tarjeta + '\n' : '')
-          + '💰 Monto: $200\n\n'
+          + '💰 Monto: $250\n\n'
           + '📌 *En el concepto escribe:* ' + clabeInfo.concepto + '\n\n'
           + 'Manda foto o captura de pantalla de tu comprobante aquí mismo ✨'
           + (sucursalMapsUrl ? '\n\n📍 *Ubicación CIRE ' + activeBranch.name + ':*\n' + sucursalMapsUrl : '')
