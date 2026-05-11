@@ -40,9 +40,12 @@ export async function PATCH(request, { params }) {
     const { id } = await params
     const body = await request.json()
     const supabase = createSupabaseAdmin()
+    const updateData = { updated_at: new Date().toISOString() }
+    if (body.label !== undefined) updateData.label = body.label ?? null
+    if (body.stage !== undefined) updateData.stage = body.stage
     const { error } = await supabase
       .from('leads')
-      .update({ label: body.label ?? null, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', id)
     if (error) throw error
     return NextResponse.json({ ok: true })

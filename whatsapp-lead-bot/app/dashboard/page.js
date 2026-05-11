@@ -66,7 +66,13 @@ export default function Dashboard() {
   const [newQR, setNewQR] = useState({ shortcut: '', content: '' })
   const [savingQR, setSavingQR] = useState(false)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const [dragOverStage, setDragOverStage] = useState(null)
+  const [labels, setLabels] = useState([])
+  const [newLabelForm, setNewLabelForm] = useState({ label: '', emoji: '', color: '#8B5CF6' })
+  const [savingLabel, setSavingLabel] = useState(false)
+  const [deletingLabelId, setDeletingLabelId] = useState(null)
   const fileInputRef = useRef(null)
+  const draggedLeadRef = useRef(null)
 
   const PRESET_IMAGES = [
     { label: '👙 Bikini Hot Sale', file: 'Bikini-hotsale.jpeg' },
@@ -83,6 +89,7 @@ export default function Dashboard() {
     fetchBranches()
     fetchAnticipos()
     fetchQuickReplies()
+    fetchLabels()
     const interval = setInterval(() => { fetchLeads(); fetchAnticipos() }, 30000)
     return () => clearInterval(interval)
   }, [])
@@ -166,6 +173,47 @@ export default function Dashboard() {
       alert('Error: ' + e.message)
     } finally {
       setSavingQR(false)
+    }
+  }
+
+  async function fetchLabels() {
+    try {
+      const res = await fetch('/api/dashboard/labels')
+      const data = await res.json()
+      setLabels(Array.isArray(data) ? data : [])
+    } catch {}
+  }
+
+  async function createLabel() {
+    if (!newLabelForm.label.trim()) return
+    setSavingLabel(true)
+    try {
+      const res = await fetch('/api/dashboard/labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLabelForm),
+      })
+      const data = await res.json()
+      if (data.error) { alert(data.error); return }
+      setLabels((prev) => [...prev, data].sort((a, b) => a.label.localeCompare(b.label)))
+      setNewLabelForm({ label: '', emoji: '', color: '#8B5CF6' })
+    } catch (e) {
+      alert('Error: ' + e.message)
+    } finally {
+      setSavingLabel(false)
+    }
+  }
+
+  async function deleteLabel(id) {
+    if (!confirm('¿Eliminar esta etiqueta?')) return
+    setDeletingLabelId(id)
+    try {
+      await fetch(`/api/dashboard/labels/${id}`, { method: 'DELETE' })
+      setLabels((prev) => prev.filter((l) => l.id !== id))
+    } catch (e) {
+      alert('Error: ' + e.message)
+    } finally {
+      setDeletingLabelId(null)
     }
   }
 
@@ -379,6 +427,40 @@ export default function Dashboard() {
     }
   }
 
+  async function handleUpdateLabel(leadId, newLabel) {
+    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, label: newLabel } : l))
+    if (selected?.id === leadId) setSelected((prev) => ({ ...prev, label: newLabel }))
+    try {
+      const res = await fetch(`/api/dashboard/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: newLabel }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Error')
+    } catch (e) {
+      fetchLeads()
+      alert('Error al actualizar etiqueta: ' + e.message)
+    }
+  }
+
+  async function handleUpdateStage(leadId, newStage) {
+    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, stage: newStage } : l))
+    if (selected?.id === leadId) setSelected((prev) => ({ ...prev, stage: newStage }))
+    try {
+      const res = await fetch(`/api/dashboard/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newStage }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Error')
+    } catch (e) {
+      fetchLeads()
+      alert('Error al actualizar etapa: ' + e.message)
+    }
+  }
+
   const lastConv = selected?.last_conversation
   const selectedStage = STAGE_MAP[selected?.stage] || { label: selected?.stage, color: '#6b7280' }
 
@@ -392,6 +474,7 @@ export default function Dashboard() {
           { key: 'conversaciones', label: '💬 Conversaciones' },
           { key: 'pipeline', label: '📊 Pipeline CRM' },
           { key: 'anticipos', label: '💳 Anticipos' + (anticipos.length > 0 ? ` (${anticipos.length})` : '') },
+          { key: 'etiquetas', label: '🏷️ Etiquetas' },
         ].map((t) => (
           <button
             key={t.key}
@@ -557,7 +640,25 @@ export default function Dashboard() {
                   </div>
 
                   {/* Cards */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto', maxHeight: 'calc(100vh - 185px)' }}>
+                  <div
+                    style={{
+                      display: 'flex', flexDirection: 'column', gap: '8px', flex: 1,
+                      overflowY: 'auto', maxHeight: 'calc(100vh - 185px)',
+                      borderRadius: '10px', padding: '4px',
+                      background: dragOverStage === stage.key ? stage.color + '18' : 'transparent',
+                      border: dragOverStage === stage.key ? `2px dashed ${stage.color}` : '2px solid transparent',
+                      transition: 'background 0.15s, border 0.15s',
+                    }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverStage(stage.key) }}
+                    onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverStage(null) }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const dragged = draggedLeadRef.current
+                      if (dragged && dragged.stage !== stage.key) handleUpdateStage(dragged.id, stage.key)
+                      draggedLeadRef.current = null
+                      setDragOverStage(null)
+                    }}
+                  >
                     {stageLeads.length === 0 && (
                       <div style={{
                         padding: '20px 12px', textAlign: 'center', color: '#d1d5db',
@@ -572,12 +673,18 @@ export default function Dashboard() {
                       return (
                         <div
                           key={lead.id}
+                          draggable
+                          onDragStart={(e) => {
+                            draggedLeadRef.current = lead
+                            e.dataTransfer.effectAllowed = 'move'
+                          }}
+                          onDragEnd={() => { draggedLeadRef.current = null; setDragOverStage(null) }}
                           onClick={() => setSelected(isSelected ? null : lead)}
                           style={{
                             background: isSelected ? '#e9f5e9' : '#fff',
                             border: isSelected ? `2px solid ${stage.color}` : '2px solid transparent',
                             borderRadius: '10px', padding: '12px',
-                            cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                            cursor: 'grab', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
                             transition: 'all 0.15s',
                           }}
                         >
@@ -718,6 +825,116 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ── TAB: ETIQUETAS ── */}
+        {tab === 'etiquetas' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+            <div style={{ maxWidth: '700px', margin: '0 auto' }}>
+              <div style={{ marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', margin: 0 }}>Gestión de etiquetas</h2>
+                <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>Crea etiquetas personalizadas para clasificar tus leads.</p>
+              </div>
+
+              {/* Formulario nueva etiqueta */}
+              <div style={{ background: '#fff', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: '20px' }}>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '14px' }}>+ Nueva etiqueta</div>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div style={{ flex: '2', minWidth: '160px' }}>
+                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600', marginBottom: '4px' }}>NOMBRE</div>
+                    <input
+                      value={newLabelForm.label}
+                      onChange={(e) => setNewLabelForm((p) => ({ ...p, label: e.target.value }))}
+                      placeholder="ej. VIP, Promo mayo..."
+                      onKeyDown={(e) => { if (e.key === 'Enter') createLabel() }}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ flex: '0 0 80px' }}>
+                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600', marginBottom: '4px' }}>EMOJI</div>
+                    <input
+                      value={newLabelForm.emoji}
+                      onChange={(e) => setNewLabelForm((p) => ({ ...p, emoji: e.target.value }))}
+                      placeholder="🏷️"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '18px', outline: 'none', textAlign: 'center', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ flex: '0 0 60px' }}>
+                    <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600', marginBottom: '4px' }}>COLOR</div>
+                    <input
+                      type="color"
+                      value={newLabelForm.color}
+                      onChange={(e) => setNewLabelForm((p) => ({ ...p, color: e.target.value }))}
+                      style={{ width: '100%', height: '38px', padding: '2px', borderRadius: '8px', border: '1px solid #e5e7eb', cursor: 'pointer', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <button
+                    onClick={createLabel}
+                    disabled={savingLabel || !newLabelForm.label.trim()}
+                    style={{
+                      padding: '8px 20px', borderRadius: '8px', border: 'none',
+                      background: savingLabel || !newLabelForm.label.trim() ? '#9ca3af' : '#075e54',
+                      color: '#fff', fontSize: '13px', fontWeight: '700',
+                      cursor: savingLabel || !newLabelForm.label.trim() ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap', height: '38px',
+                    }}
+                  >
+                    {savingLabel ? 'Guardando...' : 'Crear'}
+                  </button>
+                </div>
+                {/* Preview */}
+                {newLabelForm.label.trim() && (
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>Vista previa:</span>
+                    <span style={{
+                      fontSize: '12px', padding: '3px 10px', borderRadius: '12px', fontWeight: '600',
+                      background: newLabelForm.color + '20', color: newLabelForm.color,
+                      border: `1px solid ${newLabelForm.color}40`,
+                    }}>
+                      {newLabelForm.emoji} {newLabelForm.label}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Lista de etiquetas */}
+              <div style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f4f6', fontSize: '13px', fontWeight: '700', color: '#374151' }}>
+                  {labels.length} etiqueta{labels.length !== 1 ? 's' : ''}
+                </div>
+                {labels.length === 0 && (
+                  <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>Sin etiquetas</div>
+                )}
+                {labels.map((lbl) => (
+                  <div key={lbl.id} style={{ padding: '12px 20px', borderBottom: '1px solid #f9fafb', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '10px', height: '10px', borderRadius: '50%',
+                      background: lbl.color, flexShrink: 0,
+                    }} />
+                    <span style={{
+                      fontSize: '13px', padding: '3px 10px', borderRadius: '12px', fontWeight: '600',
+                      background: lbl.color + '20', color: lbl.color,
+                    }}>
+                      {lbl.emoji} {lbl.label}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace' }}>{lbl.key}</span>
+                    <button
+                      onClick={() => deleteLabel(lbl.id)}
+                      disabled={deletingLabelId === lbl.id}
+                      style={{
+                        marginLeft: 'auto', padding: '4px 10px', borderRadius: '6px',
+                        border: '1px solid #fecaca', background: 'transparent',
+                        color: '#dc2626', fontSize: '12px', cursor: 'pointer',
+                        opacity: deletingLabelId === lbl.id ? 0.5 : 1,
+                      }}
+                    >
+                      {deletingLabelId === lbl.id ? '...' : 'Eliminar'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── PANEL DERECHO: CONVERSACIÓN ── */}
         {!selected && tab === 'conversaciones' ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
@@ -742,9 +959,33 @@ export default function Dashboard() {
                   <span>{selected.phone}</span>
                   {selected.branches?.name && <><span>·</span><span>{selected.branches.name}</span></>}
                   <span>·</span>
-                  <span style={{ background: selectedStage.color + '40', color: '#fff', padding: '1px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600' }}>
-                    {selectedStage.label}
-                  </span>
+                  <select
+                    value={selected.stage || 'nuevo'}
+                    onChange={(e) => handleUpdateStage(selected.id, e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      background: selectedStage.color + '50', color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.3)', borderRadius: '10px',
+                      padding: '1px 6px', fontSize: '11px', fontWeight: '600',
+                      cursor: 'pointer', outline: 'none',
+                    }}
+                  >
+                    {STAGES.map((s) => <option key={s.key} value={s.key} style={{ background: '#1f4f4a', color: '#fff' }}>{s.label}</option>)}
+                  </select>
+                  <span>·</span>
+                  <select
+                    value={selected.label || 'nuevo_pedido'}
+                    onChange={(e) => handleUpdateLabel(selected.id, e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      background: 'rgba(255,255,255,0.15)', color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.3)', borderRadius: '10px',
+                      padding: '1px 6px', fontSize: '11px', fontWeight: '600',
+                      cursor: 'pointer', outline: 'none', maxWidth: '140px',
+                    }}
+                  >
+                    {LABELS.map((l) => <option key={l.key} value={l.key} style={{ background: '#1f4f4a', color: '#fff' }}>{l.emoji} {l.label}</option>)}
+                  </select>
                   {lastConv && (
                     <><span>·</span>
                     <span style={{ background: (STATUS_LABELS[lastConv.status]?.color || '#6b7280') + '40', color: '#fff', padding: '1px 8px', borderRadius: '10px', fontSize: '11px' }}>
