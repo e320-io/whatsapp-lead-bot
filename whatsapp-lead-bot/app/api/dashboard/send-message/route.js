@@ -29,6 +29,12 @@ export async function POST(request) {
 
     if (leadError || !lead) throw new Error('Lead no encontrado')
 
+    // Pausar el bot permanentemente cuando el asesor envía cualquier mensaje
+    await supabase
+      .from('conversations')
+      .update({ bot_paused: true })
+      .eq('id', conversationId)
+
     if (message?.trim()) {
       await sendWhatsAppMessage(lead.phone, message.trim())
       await supabase.from('messages').insert({

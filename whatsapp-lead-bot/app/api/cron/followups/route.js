@@ -36,10 +36,13 @@ export async function GET(request) {
       // Traer conversaciones del lead
       const { data: conversations } = await supabase
         .from('conversations')
-        .select('id')
+        .select('id, bot_paused')
         .eq('lead_id', lead.id)
 
       if (!conversations?.length) continue
+
+      // Si alguna conversación tiene el bot pausado (asesor humano tomó control), no enviar seguimiento
+      if (conversations.some((c) => c.bot_paused)) continue
 
       const convIds = conversations.map((c) => c.id)
 
