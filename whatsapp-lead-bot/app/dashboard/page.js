@@ -551,6 +551,8 @@ export default function Dashboard() {
                 const isSelected = selected?.id === lead.id
                 const stageInfo = STAGE_MAP[lead.stage] || { label: lead.stage, color: '#6b7280' }
                 const lastMsg = lead.last_message
+                const hasUnread = lead.bot_paused && (lead.unread_count > 0 || lastMsg?.role === 'lead')
+                const badgeCount = lead.unread_count || (lastMsg?.role === 'lead' ? 1 : 0)
                 return (
                   <div
                     key={lead.id}
@@ -571,27 +573,27 @@ export default function Dashboard() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: '600', fontSize: '15px', color: '#111827' }}>{lead.name || 'Sin nombre'}</span>
-                        <span style={{ fontSize: '12px', color: '#9ca3af', flexShrink: 0 }}>{formatTime(lastMsg?.created_at || lead.created_at)}</span>
+                        <span style={{ fontWeight: hasUnread ? '700' : '600', fontSize: '15px', color: '#111827' }}>{lead.name || 'Sin nombre'}</span>
+                        <span style={{ fontSize: '12px', color: hasUnread ? '#25d366' : '#9ca3af', fontWeight: hasUnread ? '600' : '400', flexShrink: 0 }}>{formatTime(lastMsg?.created_at || lead.created_at)}</span>
                       </div>
                       <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '1px' }}>
                         {lead.phone}
                         {lead.conversation_count > 1 && <span style={{ marginLeft: '6px', fontSize: '11px', color: '#9ca3af' }}>· {lead.conversation_count} sesiones</span>}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                        <span style={{ fontSize: '13px', color: lastMsg?.role === 'bot' ? '#9ca3af' : '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                        <span style={{ fontSize: '13px', color: lastMsg?.role === 'bot' ? '#9ca3af' : '#374151', fontWeight: hasUnread ? '500' : '400', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
                           {lastMsg
                             ? (lastMsg.role === 'bot' ? '✓✓ ' : '') + lastMsg.content
                             : 'Sin mensajes'}
                         </span>
-                        {lead.bot_paused && lead.unread_count > 0 ? (
+                        {hasUnread ? (
                           <span className="unread-badge" style={{
                             background: '#25d366', color: '#fff', borderRadius: '50%',
                             minWidth: '20px', height: '20px', display: 'flex', alignItems: 'center',
                             justifyContent: 'center', fontSize: '11px', fontWeight: '700',
-                            flexShrink: 0, marginLeft: '6px', padding: '0 3px',
+                            flexShrink: 0, marginLeft: '8px', padding: '0 3px',
                           }}>
-                            {lead.unread_count}
+                            {badgeCount}
                           </span>
                         ) : (
                           <span style={{
@@ -687,6 +689,8 @@ export default function Dashboard() {
                     {stageLeads.map((lead) => {
                       const isSelected = selected?.id === lead.id
                       const lastMsg = lead.last_message
+                      const hasUnread = lead.bot_paused && (lead.unread_count > 0 || lastMsg?.role === 'lead')
+                      const badgeCount = lead.unread_count || (lastMsg?.role === 'lead' ? 1 : 0)
                       return (
                         <div
                           key={lead.id}
@@ -699,23 +703,23 @@ export default function Dashboard() {
                           onClick={() => setSelected(isSelected ? null : lead)}
                           style={{
                             background: isSelected ? '#e9f5e9' : '#fff',
-                            border: isSelected ? `2px solid ${stage.color}` : '2px solid transparent',
+                            border: isSelected ? `2px solid ${stage.color}` : hasUnread ? '2px solid #25d36640' : '2px solid transparent',
                             borderRadius: '10px', padding: '12px',
-                            cursor: 'grab', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                            cursor: 'grab', boxShadow: hasUnread ? '0 1px 6px rgba(37,211,102,0.2)' : '0 1px 4px rgba(0,0,0,0.08)',
                             transition: 'all 0.15s', position: 'relative',
                           }}
                         >
-                          {lead.bot_paused && lead.unread_count > 0 && (
+                          {hasUnread && (
                             <span className="unread-badge" style={{
                               position: 'absolute', top: '8px', right: '8px',
                               background: '#25d366', color: '#fff', borderRadius: '50%',
                               minWidth: '20px', height: '20px', display: 'flex', alignItems: 'center',
                               justifyContent: 'center', fontSize: '11px', fontWeight: '700', padding: '0 3px',
                             }}>
-                              {lead.unread_count}
+                              {badgeCount}
                             </span>
                           )}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', paddingRight: lead.bot_paused && lead.unread_count > 0 ? '24px' : '0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', paddingRight: hasUnread ? '24px' : '0' }}>
                             <div style={{
                               width: '32px', height: '32px', borderRadius: '50%', background: '#25d366',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',

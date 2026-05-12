@@ -45,14 +45,15 @@ export async function GET() {
     })
 
     const unreadByLead = {}
-    Object.keys(msgsByLead).forEach(leadId => {
+    Object.keys(lastConvByLead).forEach(leadId => {
       const conv = lastConvByLead[leadId]
       if (!conv?.bot_paused) return
-      const msgs = msgsByLead[leadId] // newest first (desc order)
-      const lastBotIdx = msgs.findIndex(m => m.role === 'bot')
+      // Scope to last conversation only — avoids bot msgs from older closed convs
+      const convMsgs = (msgsByLead[leadId] || []).filter(m => m.conversation_id === conv.id)
+      const lastBotIdx = convMsgs.findIndex(m => m.role === 'bot')
       unreadByLead[leadId] = lastBotIdx === -1
-        ? msgs.filter(m => m.role === 'lead').length
-        : msgs.slice(0, lastBotIdx).filter(m => m.role === 'lead').length
+        ? convMsgs.filter(m => m.role === 'lead').length
+        : convMsgs.slice(0, lastBotIdx).filter(m => m.role === 'lead').length
     })
 
     const result = leads.map(lead => ({
