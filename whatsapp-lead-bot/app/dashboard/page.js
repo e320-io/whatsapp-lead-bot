@@ -466,6 +466,10 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'system-ui, sans-serif', background: '#f0f2f5' }}>
+      <style>{`
+        @keyframes pulse-badge { 0%,100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+        .unread-badge { animation: pulse-badge 1.6s ease-in-out infinite; }
+      `}</style>
 
       {/* Top bar con tabs */}
       <div style={{ background: '#075e54', display: 'flex', alignItems: 'center', padding: '0 24px', gap: '4px', flexShrink: 0 }}>
@@ -575,16 +579,29 @@ export default function Dashboard() {
                         {lead.conversation_count > 1 && <span style={{ marginLeft: '6px', fontSize: '11px', color: '#9ca3af' }}>· {lead.conversation_count} sesiones</span>}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                        <span style={{ fontSize: '13px', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
-                          {lastMsg ? (lastMsg.role === 'bot' ? '🤖 ' : '👤 ') + lastMsg.content : 'Sin mensajes'}
+                        <span style={{ fontSize: '13px', color: lastMsg?.role === 'bot' ? '#9ca3af' : '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                          {lastMsg
+                            ? (lastMsg.role === 'bot' ? '✓✓ ' : '') + lastMsg.content
+                            : 'Sin mensajes'}
                         </span>
-                        <span style={{
-                          fontSize: '11px', padding: '2px 8px', borderRadius: '12px',
-                          background: stageInfo.color + '20', color: stageInfo.color, fontWeight: '600',
-                          flexShrink: 0, marginLeft: '4px'
-                        }}>
-                          {stageInfo.label}
-                        </span>
+                        {lead.bot_paused && lead.unread_count > 0 ? (
+                          <span className="unread-badge" style={{
+                            background: '#25d366', color: '#fff', borderRadius: '50%',
+                            minWidth: '20px', height: '20px', display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', fontSize: '11px', fontWeight: '700',
+                            flexShrink: 0, marginLeft: '6px', padding: '0 3px',
+                          }}>
+                            {lead.unread_count}
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: '11px', padding: '2px 8px', borderRadius: '12px',
+                            background: stageInfo.color + '20', color: stageInfo.color, fontWeight: '600',
+                            flexShrink: 0, marginLeft: '4px'
+                          }}>
+                            {stageInfo.label}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -685,10 +702,20 @@ export default function Dashboard() {
                             border: isSelected ? `2px solid ${stage.color}` : '2px solid transparent',
                             borderRadius: '10px', padding: '12px',
                             cursor: 'grab', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                            transition: 'all 0.15s',
+                            transition: 'all 0.15s', position: 'relative',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                          {lead.bot_paused && lead.unread_count > 0 && (
+                            <span className="unread-badge" style={{
+                              position: 'absolute', top: '8px', right: '8px',
+                              background: '#25d366', color: '#fff', borderRadius: '50%',
+                              minWidth: '20px', height: '20px', display: 'flex', alignItems: 'center',
+                              justifyContent: 'center', fontSize: '11px', fontWeight: '700', padding: '0 3px',
+                            }}>
+                              {lead.unread_count}
+                            </span>
+                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', paddingRight: lead.bot_paused && lead.unread_count > 0 ? '24px' : '0' }}>
                             <div style={{
                               width: '32px', height: '32px', borderRadius: '50%', background: '#25d366',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -705,11 +732,11 @@ export default function Dashboard() {
                           </div>
                           {lastMsg && (
                             <div style={{
-                              fontSize: '12px', color: '#6b7280', padding: '6px 8px',
-                              background: '#f9fafb', borderRadius: '6px',
+                              fontSize: '12px', color: lastMsg.role === 'bot' ? '#9ca3af' : '#374151',
+                              padding: '6px 8px', background: '#f9fafb', borderRadius: '6px',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                             }}>
-                              {lastMsg.role === 'bot' ? '🤖 ' : '👤 '}{lastMsg.content}
+                              {lastMsg.role === 'bot' ? '✓✓ ' : ''}{lastMsg.content}
                             </div>
                           )}
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: '#9ca3af' }}>

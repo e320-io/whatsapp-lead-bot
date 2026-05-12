@@ -28,17 +28,31 @@ export async function GET() {
     let lastMsgs = []
     if (allConvIds.length) {
       lastMsgs = await supabaseAdminFetch(
-        `messages?select=conversation_id,content,role,created_at&conversation_id=in.(${allConvIds.join(',')})&order=created_at.desc`
+        `messages?select=conversation_id,content,role,created_at,is_human_agent&conversation_id=in.(${allConvIds.join(',')})&order=created_at.desc`
       )
     }
 
     const lastMsgByLead = {}
     const firstMsgByLead = {}
+    const msgsByLead = {}
     lastMsgs?.forEach?.((m) => {
       const conv = conversations?.find(c => c.id === m.conversation_id)
       if (!conv) return
       if (!lastMsgByLead[conv.lead_id]) lastMsgByLead[conv.lead_id] = m
       firstMsgByLead[conv.lead_id] = m // always overwrite → desc order → last value is oldest
+      if (!msgsByLead[conv.lead_id]) msgsByLead[conv.lead_id] = []
+      msgsByLead[conv.lead_id].push(m)
+    })
+
+    const unreadByLead = {}
+    Object.keys(msgsByLead).forEach(leadId => {
+      const conv = lastConvByLead[leadId]
+      if (!conv?.bot_paused) return
+      const msgs = msgsByLead[leadId] // newest first (desc order)
+      const lastBotIdx = msgs.findIndex(m => m.role === 'bot')
+      unreadByLead[leadId] = lastBotIdx === -1
+        ? msgs.filter(m => m.role === 'lead').length
+        : msgs.slice(0, lastBotIdx).filter(m => m.role === 'lead').length
     })
 
     const result = leads.map(lead => ({
@@ -47,6 +61,8 @@ export async function GET() {
       conversation_count: allConvIdsByLead[lead.id]?.length || 0,
       last_message: lastMsgByLead[lead.id] || null,
       first_message: firstMsgByLead[lead.id] || null,
+      bot_paused: lastConvByLead[lead.id]?.bot_paused || false,
+      unread_count: unreadByLead[lead.id] || 0,
     }))
 
     return NextResponse.json(result)
