@@ -72,6 +72,10 @@ export default function Dashboard() {
   const [newLabelForm, setNewLabelForm] = useState({ label: '', emoji: '', color: '#8B5CF6' })
   const [savingLabel, setSavingLabel] = useState(false)
   const [deletingLabelId, setDeletingLabelId] = useState(null)
+  const [labelMenuOpenId, setLabelMenuOpenId] = useState(null)
+  const [editingLabel, setEditingLabel] = useState(null)
+  const [editLabelForm, setEditLabelForm] = useState({ label: '', emoji: '', color: '#8B5CF6' })
+  const [savingEditLabel, setSavingEditLabel] = useState(false)
   const fileInputRef = useRef(null)
   const draggedLeadRef = useRef(null)
 
@@ -94,6 +98,13 @@ export default function Dashboard() {
     const interval = setInterval(() => { fetchLeads(); fetchAnticipos() }, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (!labelMenuOpenId) return
+    function close() { setLabelMenuOpenId(null) }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [labelMenuOpenId])
 
   // Al seleccionar un lead: carga inicial + sincroniza botPaused desde DB
   useEffect(() => {
@@ -438,20 +449,48 @@ export default function Dashboard() {
     }
   }
 
-  async function handleUpdateLabel(leadId, newLabel) {
-    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, label: newLabel } : l))
-    if (selected?.id === leadId) setSelected((prev) => ({ ...prev, label: newLabel }))
+  async function handleToggleLabel(leadId, labelKey) {
+    const lead = leads.find((l) => l.id === leadId) || selected
+    const current = lead?.labels || []
+    const isActive = current.includes(labelKey)
+    const next = isActive ? current.filter((k) => k !== labelKey) : [...current, labelKey]
+    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, labels: next } : l))
+    if (selected?.id === leadId) setSelected((prev) => ({ ...prev, labels: next }))
     try {
       const res = await fetch(`/api/dashboard/leads/${leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: newLabel }),
+        body: JSON.stringify(isActive ? { removeLabel: labelKey } : { addLabel: labelKey }),
       })
       const data = await res.json()
       if (!data.ok) throw new Error(data.error || 'Error')
     } catch (e) {
       fetchLeads()
       alert('Error al actualizar etiqueta: ' + e.message)
+    }
+  }
+
+  function startEditLabel(lbl) {
+    setEditingLabel(lbl.id)
+    setEditLabelForm({ label: lbl.label, emoji: lbl.emoji || '', color: lbl.color || '#8B5CF6' })
+  }
+
+  async function saveEditLabel(id) {
+    setSavingEditLabel(true)
+    try {
+      const res = await fetch(`/api/dashboard/labels/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editLabelForm),
+      })
+      const data = await res.json()
+      if (data.error) { alert(data.error); return }
+      setLabels((prev) => prev.map((l) => l.id === id ? data : l).sort((a, b) => a.label.localeCompare(b.label)))
+      setEditingLabel(null)
+    } catch (e) {
+      alert('Error: ' + e.message)
+    } finally {
+      setSavingEditLabel(false)
     }
   }
 
@@ -631,6 +670,26 @@ export default function Dashboard() {
                           </span>
                         )}
                       </div>
+                      {(lead.labels || []).length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
+                          {(lead.labels || []).slice(0, 3).map((key) => {
+                            const lbl = labels.find((l) => l.key === key)
+                            if (!lbl) return null
+                            return (
+                              <span key={key} style={{
+                                fontSize: '10px', padding: '1px 6px', borderRadius: '10px',
+                                background: lbl.color + '18', color: lbl.color,
+                                border: '1px solid ' + lbl.color + '40', fontWeight: '600',
+                              }}>
+                                {lbl.emoji} {lbl.label}
+                              </span>
+                            )
+                          })}
+                          {(lead.labels || []).length > 3 && (
+                            <span style={{ fontSize: '10px', color: '#9ca3af', alignSelf: 'center' }}>+{lead.labels.length - 3}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -961,30 +1020,85 @@ export default function Dashboard() {
                   <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>Sin etiquetas</div>
                 )}
                 {labels.map((lbl) => (
-                  <div key={lbl.id} style={{ padding: '12px 20px', borderBottom: '1px solid #f9fafb', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{
-                      width: '10px', height: '10px', borderRadius: '50%',
-                      background: lbl.color, flexShrink: 0,
-                    }} />
-                    <span style={{
-                      fontSize: '13px', padding: '3px 10px', borderRadius: '12px', fontWeight: '600',
-                      background: lbl.color + '20', color: lbl.color,
-                    }}>
-                      {lbl.emoji} {lbl.label}
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace' }}>{lbl.key}</span>
-                    <button
-                      onClick={() => deleteLabel(lbl.id)}
-                      disabled={deletingLabelId === lbl.id}
-                      style={{
-                        marginLeft: 'auto', padding: '4px 10px', borderRadius: '6px',
-                        border: '1px solid #fecaca', background: 'transparent',
-                        color: '#dc2626', fontSize: '12px', cursor: 'pointer',
-                        opacity: deletingLabelId === lbl.id ? 0.5 : 1,
-                      }}
-                    >
-                      {deletingLabelId === lbl.id ? '...' : 'Eliminar'}
-                    </button>
+                  <div key={lbl.id} style={{ borderBottom: '1px solid #f9fafb' }}>
+                    {editingLabel === lbl.id ? (
+                      <div style={{ padding: '12px 20px', display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap', background: '#f9fafb' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600', marginBottom: '3px' }}>NOMBRE</div>
+                          <input
+                            value={editLabelForm.label}
+                            onChange={(e) => setEditLabelForm((p) => ({ ...p, label: e.target.value }))}
+                            style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid #e5e7eb', fontSize: '13px', outline: 'none', width: '140px' }}
+                          />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600', marginBottom: '3px' }}>EMOJI</div>
+                          <input
+                            value={editLabelForm.emoji}
+                            onChange={(e) => setEditLabelForm((p) => ({ ...p, emoji: e.target.value }))}
+                            style={{ padding: '6px 8px', borderRadius: '7px', border: '1px solid #e5e7eb', fontSize: '18px', outline: 'none', width: '56px', textAlign: 'center' }}
+                          />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600', marginBottom: '3px' }}>COLOR</div>
+                          <input
+                            type="color"
+                            value={editLabelForm.color}
+                            onChange={(e) => setEditLabelForm((p) => ({ ...p, color: e.target.value }))}
+                            style={{ width: '44px', height: '34px', padding: '2px', borderRadius: '7px', border: '1px solid #e5e7eb', cursor: 'pointer' }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => saveEditLabel(lbl.id)}
+                          disabled={savingEditLabel || !editLabelForm.label.trim()}
+                          style={{
+                            padding: '6px 16px', borderRadius: '7px', border: 'none', height: '34px',
+                            background: savingEditLabel ? '#9ca3af' : '#075e54',
+                            color: '#fff', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                          }}
+                        >
+                          {savingEditLabel ? '...' : 'Guardar'}
+                        </button>
+                        <button
+                          onClick={() => setEditingLabel(null)}
+                          style={{ padding: '6px 12px', borderRadius: '7px', border: '1px solid #e5e7eb', background: '#fff', fontSize: '13px', cursor: 'pointer', height: '34px' }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: lbl.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: '13px', padding: '3px 10px', borderRadius: '12px', fontWeight: '600', background: lbl.color + '20', color: lbl.color }}>
+                          {lbl.emoji} {lbl.label}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace' }}>{lbl.key}</span>
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => startEditLabel(lbl)}
+                            style={{
+                              padding: '4px 10px', borderRadius: '6px',
+                              border: '1px solid #e5e7eb', background: 'transparent',
+                              color: '#374151', fontSize: '12px', cursor: 'pointer',
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => deleteLabel(lbl.id)}
+                            disabled={deletingLabelId === lbl.id}
+                            style={{
+                              padding: '4px 10px', borderRadius: '6px',
+                              border: '1px solid #fecaca', background: 'transparent',
+                              color: '#dc2626', fontSize: '12px', cursor: 'pointer',
+                              opacity: deletingLabelId === lbl.id ? 0.5 : 1,
+                            }}
+                          >
+                            {deletingLabelId === lbl.id ? '...' : 'Eliminar'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1030,19 +1144,72 @@ export default function Dashboard() {
                     {STAGES.map((s) => <option key={s.key} value={s.key} style={{ background: '#1f4f4a', color: '#fff' }}>{s.label}</option>)}
                   </select>
                   <span>·</span>
-                  <select
-                    value={selected.label || 'nuevo_pedido'}
-                    onChange={(e) => handleUpdateLabel(selected.id, e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      background: 'rgba(255,255,255,0.15)', color: '#fff',
-                      border: '1px solid rgba(255,255,255,0.3)', borderRadius: '10px',
-                      padding: '1px 6px', fontSize: '11px', fontWeight: '600',
-                      cursor: 'pointer', outline: 'none', maxWidth: '140px',
-                    }}
-                  >
-                    {LABELS.map((l) => <option key={l.key} value={l.key} style={{ background: '#1f4f4a', color: '#fff' }}>{l.emoji} {l.label}</option>)}
-                  </select>
+                  <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', alignItems: 'center' }}>
+                      {(selected.labels || []).map((key) => {
+                        const lbl = labels.find((l) => l.key === key)
+                        if (!lbl) return null
+                        return (
+                          <span
+                            key={key}
+                            style={{
+                              fontSize: '11px', padding: '1px 6px', borderRadius: '10px',
+                              background: lbl.color + '40', color: '#fff',
+                              border: '1px solid ' + lbl.color + '80',
+                              fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '2px',
+                            }}
+                          >
+                            {lbl.emoji} {lbl.label}
+                            <span
+                              onClick={(e) => { e.stopPropagation(); handleToggleLabel(selected.id, key) }}
+                              style={{ marginLeft: '2px', cursor: 'pointer', opacity: 0.8, lineHeight: 1 }}
+                            >×</span>
+                          </span>
+                        )
+                      })}
+                      <button
+                        onClick={() => setLabelMenuOpenId((v) => v === selected.id ? null : selected.id)}
+                        style={{
+                          padding: '1px 8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.4)',
+                          background: 'rgba(255,255,255,0.15)', color: '#fff',
+                          fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                        }}
+                      >
+                        {(selected.labels || []).length === 0 ? '+ Etiqueta' : '+'}
+                      </button>
+                    </div>
+                    {labelMenuOpenId === selected.id && (
+                      <div style={{
+                        position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200,
+                        background: '#fff', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+                        minWidth: '200px', maxHeight: '260px', overflowY: 'auto', padding: '4px 0',
+                      }}>
+                        {labels.map((lbl) => {
+                          const active = (selected.labels || []).includes(lbl.key)
+                          return (
+                            <div
+                              key={lbl.key}
+                              onClick={() => handleToggleLabel(selected.id, lbl.key)}
+                              style={{
+                                padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                                background: active ? lbl.color + '15' : 'transparent',
+                              }}
+                            >
+                              <span style={{
+                                width: '14px', height: '14px', borderRadius: '3px', flexShrink: 0,
+                                border: '2px solid ' + lbl.color,
+                                background: active ? lbl.color : 'transparent',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {active && <span style={{ color: '#fff', fontSize: '9px', lineHeight: 1 }}>✓</span>}
+                              </span>
+                              <span style={{ fontSize: '13px', color: lbl.color, fontWeight: '600' }}>{lbl.emoji} {lbl.label}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                   {lastConv && (
                     <><span>·</span>
                     <span style={{ background: (STATUS_LABELS[lastConv.status]?.color || '#6b7280') + '40', color: '#fff', padding: '1px 8px', borderRadius: '10px', fontSize: '11px' }}>

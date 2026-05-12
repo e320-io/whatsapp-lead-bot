@@ -4,7 +4,7 @@ import { supabaseAdminFetch } from '@/lib/supabase'
 export async function GET() {
   try {
     const leads = await supabaseAdminFetch(
-      'leads?select=id,name,phone,stage,label,source,created_at,branch_id,branches(name)&order=created_at.desc&limit=200'
+      'leads?select=id,name,phone,stage,label,source,created_at,branch_id,branches(name),lead_labels(label_key)&order=created_at.desc&limit=200'
     )
 
     if (!Array.isArray(leads)) throw new Error(leads?.message || 'Error fetching leads')
@@ -58,6 +58,8 @@ export async function GET() {
 
     const result = leads.map(lead => ({
       ...lead,
+      labels: (lead.lead_labels || []).map(ll => ll.label_key),
+      lead_labels: undefined,
       last_conversation: lastConvByLead[lead.id] || null,
       conversation_count: allConvIdsByLead[lead.id]?.length || 0,
       last_message: lastMsgByLead[lead.id] || null,

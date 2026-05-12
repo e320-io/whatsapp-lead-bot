@@ -41,12 +41,19 @@ export async function PATCH(request, { params }) {
     const body = await request.json()
     const supabase = createSupabaseAdmin()
     const updateData = { updated_at: new Date().toISOString() }
-    if (body.label !== undefined) updateData.label = body.label ?? null
+
+    // Handle multi-label toggle: { addLabel: 'key' } or { removeLabel: 'key' }
+    if (body.addLabel !== undefined) {
+      await supabase.from('lead_labels').upsert({ lead_id: id, label_key: body.addLabel }, { onConflict: 'lead_id,label_key' })
+      return NextResponse.json({ ok: true })
+    }
+    if (body.removeLabel !== undefined) {
+      await supabase.from('lead_labels').delete().eq('lead_id', id).eq('label_key', body.removeLabel)
+      return NextResponse.json({ ok: true })
+    }
+
     if (body.stage !== undefined) updateData.stage = body.stage
-    const { error } = await supabase
-      .from('leads')
-      .update(updateData)
-      .eq('id', id)
+    const { error } = await supabase.from('leads').update(updateData).eq('id', id)
     if (error) throw error
     return NextResponse.json({ ok: true })
   } catch (error) {

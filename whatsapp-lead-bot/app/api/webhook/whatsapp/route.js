@@ -11,7 +11,7 @@ var BRANCH_WHATSAPP_NUMBERS = {
   'Coapa':    '525630399230',
   'Oriente':  '525528008869',
   'Polanco':  '525528008869',
-  'Metepec':  '527291766576',
+  'Metepec':  '525528008869',
 }
 
 var MAPS_POR_SUCURSAL = {
@@ -596,6 +596,7 @@ export async function POST(request) {
       var newLabel = detectLabel(updatedLead, history, activeBranch?.name || null)
       if (newLabel !== lead.label) {
         await supabase.from('leads').update({ label: newLabel }).eq('id', lead.id)
+        await supabase.from('lead_labels').upsert({ lead_id: lead.id, label_key: newLabel }, { onConflict: 'lead_id,label_key' })
       }
     } catch (labelErr) {
       console.error('Error detectando etiqueta:', labelErr.message)
