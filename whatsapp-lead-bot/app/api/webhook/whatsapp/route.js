@@ -302,7 +302,13 @@ export async function POST(request) {
     } else {
       // El lead respondió: actualizar nombre si faltaba y resetear contadores de seguimiento
       var hadFollowUps = lead.metadata?.follow_up_count > 0
-      var stageReset = lead.stage === 'escalado' ? { stage: 'en_conversacion' } : {}
+      // Resetear notificacion_sucursal si cambió de sucursal o pasaron más de 12h (permite renotificación)
+      var notifSucursalExpired = lead.stage === 'notificacion_sucursal' && lead.updated_at
+        && (Date.now() - new Date(lead.updated_at).getTime()) > 12 * 60 * 60 * 1000
+      var notifSucursalBranchChanged = lead.stage === 'notificacion_sucursal'
+        && activeBranch?.id && lead.branch_id && activeBranch.id !== lead.branch_id
+      var stageReset = lead.stage === 'escalado' || notifSucursalExpired || notifSucursalBranchChanged
+        ? { stage: 'en_conversacion' } : {}
       var leadUpdates = {
         ...stageReset,
         metadata: Object.assign({}, lead.metadata || {}, {
@@ -432,7 +438,11 @@ export async function POST(request) {
       var branchWaPhone = BRANCH_WHATSAPP_NUMBERS[activeBranch.name]
       var alreadyNotified = lead.stage === 'notificacion_sucursal'
 
-      if (branchWaPhone && !alreadyNotified) {
+      if (!branchWaPhone) {
+        console.warn('⚠️ ALERTA: sucursal "' + activeBranch.name + '" no tiene número de WhatsApp configurado en BRANCH_WHATSAPP_NUMBERS — notificación no enviada')
+      } else if (alreadyNotified) {
+        availabilityInfo = '\n\nNOTIFICACIÓN YA ENVIADA ANTERIORMENTE: El equipo de CIRE ' + activeBranch.name + ' ya fue notificado sobre este lead. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios. Recuérdale al lead que pronto le escribirán por WhatsApp para coordinar el horario. NUNCA digas que le llamarán o marcarán.'
+      } else {
         try {
           var summaryLines = history.slice(-10).map(function(m) {
             return (m.role === 'lead' ? '👤 Lead' : '🤖 Bot') + ': ' + m.content
@@ -446,14 +456,13 @@ export async function POST(request) {
 
           await sendWhatsAppMessage(branchWaPhone, notifMsg)
           await supabase.from('leads').update({ stage: 'notificacion_sucursal', updated_at: new Date().toISOString() }).eq('id', lead.id)
+          lead.stage = 'notificacion_sucursal'
           console.log('Notificación de agendamiento enviada a sucursal ' + activeBranch.name + ' (' + branchWaPhone + ')')
 
           availabilityInfo = '\n\nNOTIFICACIÓN ENVIADA: Ya le avisaste al equipo de CIRE ' + activeBranch.name + ' que este lead quiere agendar. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios ni disponibilidad — los horarios los coordina el equipo de la sucursal directamente. Dile al lead algo como: "¡Listo! 💖 Ya le avisé a nuestro equipo en CIRE ' + activeBranch.name + ' que quieres agendar ✨ En breve te escriben por aquí para coordinar tu horario 🙌" NUNCA digas que te llamarán o marcarán.'
         } catch (err) {
-          console.error('Error enviando notificación a sucursal:', err)
+          console.error('❌ Error enviando notificación a sucursal ' + activeBranch.name + ' (' + branchWaPhone + '):', err?.message || err)
         }
-      } else {
-        availabilityInfo = '\n\nNOTIFICACIÓN YA ENVIADA ANTERIORMENTE: El equipo de CIRE ' + activeBranch.name + ' ya fue notificado sobre este lead. INSTRUCCIÓN CRÍTICA: NO ofrezcas horarios. Recuérdale al lead que pronto le escribirán por WhatsApp para coordinar el horario. NUNCA digas que le llamarán o marcarán.'
       }
     }
 
