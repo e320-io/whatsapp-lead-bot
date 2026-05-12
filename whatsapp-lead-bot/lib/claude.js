@@ -52,7 +52,7 @@ ${availabilityInfo || ''}`
 
   // Usa Sonnet solo cuando se detectan tags de acción en el historial reciente
   const lastMessages = messageHistory.slice(-5).map(m => m.content || '').join(' ').toLowerCase()
-  const hasActionTags = lastMessages.includes('crear_cita') || lastMessages.includes('solicitar_anticipo') || lastMessages.includes('solicitar_preventa')
+  const hasActionTags = lastMessages.includes('crear_cita')
   const model = hasActionTags ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
 
   try {

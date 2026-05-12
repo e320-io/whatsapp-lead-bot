@@ -140,59 +140,7 @@ export async function POST(request) {
         })
       }
 
-      // Si el lead está en anticipo_pendiente, procesar el comprobante
-      if (leadForImg.data?.stage === 'anticipo_pendiente') {
-        var pendingForImg = await supabaseImg.from('pending_appointments')
-          .select('*').eq('lead_id', leadForImg.data.id).eq('status', 'pendiente').single()
-
-        await supabaseImg.from('pending_appointments')
-          .update({ status: 'comprobante_recibido' })
-          .eq('lead_id', leadForImg.data.id)
-          .eq('status', 'pendiente')
-
-        var compReply
-        if (pendingForImg.data?.es_preventa && pendingForImg.data?.precio_total) {
-          var pd = pendingForImg.data
-          var preventaResult = await createPreventaPaquete({
-            sucursal: pd.sucursal,
-            fecha: pd.fecha,
-            hora: pd.hora,
-            servicio: pd.servicio,
-            nombre: pd.nombre,
-            telefono: pd.phone,
-            precio_total: pd.precio_total,
-            monto_inicial: pd.monto_anticipo,
-          })
-          if (preventaResult.success) {
-            await supabaseImg.from('leads').update({ stage: 'cita_agendada', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
-            var mitad = pd.monto_anticipo
-            var pendienteMonto = pd.precio_total - mitad
-            compReply = '¡Tu lugar está apartado hermosa! 🎉 Tu cita queda confirmada para el ' + pd.fecha + ' a las ' + pd.hora + ' en ' + pd.sucursal + ' ✨\n\nRecuerda que el saldo pendiente de $' + pendienteMonto + ' lo liquidas del 15 al 30 de mayo 💖'
-          } else {
-            console.error('Error creando preventa desde comprobante:', preventaResult.error)
-            await supabaseImg.from('leads').update({ stage: 'escalado', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
-            await supabaseImg.from('conversations').update({ status: 'escalada', escalated_at: new Date().toISOString() }).eq('id', convForImg.data?.id)
-            compReply = '¡Recibimos tu comprobante! ✨ En breve una asesora te confirma tu lugar 💖'
-          }
-        } else {
-          await supabaseImg.from('conversations').update({ status: 'escalada', escalated_at: new Date().toISOString() }).eq('id', convForImg.data?.id)
-          await supabaseImg.from('leads').update({ stage: 'escalado', updated_at: new Date().toISOString() }).eq('id', leadForImg.data.id)
-          compReply = '¡Recibimos tu comprobante! ✨ En breve una de nuestras asesoras lo verifica y te confirma tu cita 💖 Gracias por tu paciencia hermosa.'
-        }
-
-        if (convForImg.data) {
-          await supabaseImg.from('messages').insert({ conversation_id: convForImg.data.id, business_id: bizForImg.data.id, role: 'bot', content: compReply })
-        }
-        await sendWhatsAppMessage(phoneNumber, compReply)
-        try {
-          var finalStage = preventaResult?.success ? 'cita_agendada' : 'escalado'
-          var labelForImg = detectLabel(Object.assign({}, leadForImg.data, { stage: finalStage }), [], null)
-          await supabaseImg.from('leads').update({ label: labelForImg }).eq('id', leadForImg.data.id)
-        } catch (e) { console.error('Error actualizando etiqueta (img):', e.message) }
-        return NextResponse.json({ status: 'comprobante_recibido' })
-      }
-
-      // Para cualquier otra etapa: solo confirmar recepción
+      // Para cualquier etapa: solo confirmar recepción
       await sendWhatsAppMessage(phoneNumber, '¡Recibí tu imagen! 📸 Si tienes alguna pregunta sobre nuestros servicios, con gusto te ayudo 💖')
       return NextResponse.json({ status: 'image_saved' })
     }
@@ -520,92 +468,8 @@ export async function POST(request) {
       botReply += '\n\nEn un momento te mando los datos para la transferencia 📲'
     }
 
-    // 8a. Detectar solicitud de anticipo
-    var anticipoMatch = botReply.match(/\[SOLICITAR_ANTICIPO\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
-    if (anticipoMatch) {
-      var pendingData = {
-        lead_id: lead.id,
-        phone: phoneNumber,
-        nombre: anticipoMatch[4].trim(),
-        servicio: anticipoMatch[3].trim(),
-        fecha: anticipoMatch[1].trim(),
-        hora: anticipoMatch[2].trim(),
-        sucursal: activeBranch?.name || null,
-        monto_anticipo: 250,
-        status: 'pendiente',
-      }
-
-      await supabase.from('pending_appointments').insert(pendingData)
-      await supabase.from('leads').update({ stage: 'anticipo_pendiente', updated_at: new Date().toISOString() }).eq('id', lead.id)
-      await supabase.from('conversations').update({ bot_paused: true }).eq('id', conversation.id)
-
-      botReply = botReply.replace(/\[SOLICITAR_ANTICIPO\|[^\]]+\]/g, '').trim()
-
-      // Enviar datos bancarios en mensaje separado
-      var clabeInfo = getClabeInfo(activeBranch?.name)
-      if (clabeInfo) {
-        var sucursalMapsUrl = MAPS_POR_SUCURSAL[activeBranch?.name]
-        var clabeMsg = '💳 *Datos para transferencia — CIRE ' + activeBranch.name + '*\n\n'
-          + '🏦 Banco: ' + clabeInfo.banco + '\n'
-          + '👤 Titular: ' + clabeInfo.titular + '\n'
-          + '🔢 No. Cuenta: ' + clabeInfo.cuenta + '\n'
-          + '🔢 CLABE: ' + clabeInfo.clabe + '\n'
-          + (clabeInfo.tarjeta ? '💳 No. Tarjeta: ' + clabeInfo.tarjeta + '\n' : '')
-          + '💰 Monto: $250\n\n'
-          + '📌 *En el concepto escribe:* ' + clabeInfo.concepto + '\n\n'
-          + 'Manda foto o captura de pantalla de tu comprobante aquí mismo ✨'
-          + (sucursalMapsUrl ? '\n\n📍 *Ubicación CIRE ' + activeBranch.name + ':*\n' + sucursalMapsUrl : '')
-        // Se envía después del mensaje principal
-        setTimeout(async function() {
-          await sendWhatsAppMessage(phoneNumber, clabeMsg)
-        }, 1500)
-      }
-    }
-
-    // 8a2. Detectar solicitud de preventa Hot Sale
-    var preventaMatch = botReply.match(/\[SOLICITAR_PREVENTA\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
-    if (preventaMatch) {
-      var precioTotal = parseInt(preventaMatch[5].trim()) || 0
-      var montoInicial = Math.round(precioTotal / 2)
-      var pendingPreventaData = {
-        lead_id: lead.id,
-        phone: phoneNumber,
-        nombre: preventaMatch[4].trim(),
-        servicio: preventaMatch[3].trim(),
-        fecha: preventaMatch[1].trim(),
-        hora: preventaMatch[2].trim(),
-        sucursal: activeBranch?.name || null,
-        precio_total: precioTotal,
-        monto_anticipo: montoInicial,
-        es_preventa: true,
-        status: 'pendiente',
-      }
-
-      await supabase.from('pending_appointments').insert(pendingPreventaData)
-      await supabase.from('leads').update({ stage: 'anticipo_pendiente', updated_at: new Date().toISOString() }).eq('id', lead.id)
-      await supabase.from('conversations').update({ bot_paused: true }).eq('id', conversation.id)
-
-      botReply = botReply.replace(/\[SOLICITAR_PREVENTA\|[^\]]+\]/g, '').trim()
-
-      // Enviar datos bancarios con el monto del 50%
-      var clabePreventa = getClabeInfo(activeBranch?.name)
-      if (clabePreventa) {
-        var sucursalMapsUrlPreventa = MAPS_POR_SUCURSAL[activeBranch?.name]
-        var clabeMsgPreventa = '💳 *Datos para transferencia — CIRE ' + activeBranch.name + '*\n\n'
-          + '🏦 Banco: ' + clabePreventa.banco + '\n'
-          + '👤 Titular: ' + clabePreventa.titular + '\n'
-          + '🔢 No. Cuenta: ' + clabePreventa.cuenta + '\n'
-          + '🔢 CLABE: ' + clabePreventa.clabe + '\n'
-          + (clabePreventa.tarjeta ? '💳 No. Tarjeta: ' + clabePreventa.tarjeta + '\n' : '')
-          + '💰 Monto (50%): $' + montoInicial + '\n\n'
-          + '📌 *En el concepto escribe:* ' + clabePreventa.concepto + '\n\n'
-          + 'Manda foto o captura de pantalla de tu comprobante aquí mismo ✨'
-          + (sucursalMapsUrlPreventa ? '\n\n📍 *Ubicación CIRE ' + activeBranch.name + ':*\n' + sucursalMapsUrlPreventa : '')
-        setTimeout(async function() {
-          await sendWhatsAppMessage(phoneNumber, clabeMsgPreventa)
-        }, 1500)
-      }
-    }
+    // Limpiar tags residuales por si Claude los incluye de todas formas
+    botReply = botReply.replace(/\[SOLICITAR_ANTICIPO\|[^\]]+\]/g, '').replace(/\[SOLICITAR_PREVENTA\|[^\]]+\]/g, '').trim()
 
     // 8b. Detectar y ejecutar creación de cita (flujo legacy sin anticipo)
     var citaMatch = botReply.match(/\[CREAR_CITA\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
