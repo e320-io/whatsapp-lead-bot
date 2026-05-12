@@ -127,7 +127,7 @@ export async function POST(request) {
 
       // Guardar en la conversación activa siempre
       var convForImg = leadForImg.data
-        ? await supabaseImg.from('conversations').select('id').eq('lead_id', leadForImg.data.id).eq('status', 'activa').order('created_at', { ascending: false }).limit(1).single()
+        ? await supabaseImg.from('conversations').select('id, bot_paused').eq('lead_id', leadForImg.data.id).eq('status', 'activa').order('created_at', { ascending: false }).limit(1).single()
         : { data: null }
 
       if (convForImg.data && bizForImg.data) {
@@ -140,12 +140,30 @@ export async function POST(request) {
         })
       }
 
+      // No responder si el asesor humano tiene el control
+      if (convForImg.data?.bot_paused) {
+        return NextResponse.json({ status: 'bot_paused' })
+      }
+
       // Para cualquier etapa: solo confirmar recepción
       await sendWhatsAppMessage(phoneNumber, '¡Recibí tu imagen! 📸 Si tienes alguna pregunta sobre nuestros servicios, con gusto te ayudo 💖')
       return NextResponse.json({ status: 'image_saved' })
     }
 
     if (message.type !== 'text') {
+      // Verificar si el bot está pausado antes de responder
+      var supabaseNonText = createSupabaseAdmin()
+      var bizNonText = await supabaseNonText.from('businesses').select('id').limit(1).single()
+      var convNonText = bizNonText.data
+        ? await supabaseNonText.from('conversations')
+            .select('bot_paused')
+            .eq('status', 'activa')
+            .eq('lead_id', (await supabaseNonText.from('leads').select('id').eq('phone', phoneNumber).eq('business_id', bizNonText.data.id).single()).data?.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+        : { data: null }
+      if (convNonText.data?.bot_paused) return NextResponse.json({ status: 'bot_paused' })
       await sendWhatsAppMessage(phoneNumber, 'Por el momento solo puedo leer mensajes de texto. ¿Podrías escribirme tu consulta? 😊')
       return NextResponse.json({ status: 'non_text_handled' })
     }
@@ -324,8 +342,11 @@ export async function POST(request) {
     var conversation = convResult.data
 
     if (!conversation) {
+      // Verificar si alguna conversación anterior de este lead fue pausada por un asesor
+      var prevPausedResult = await supabase.from('conversations').select('bot_paused').eq('lead_id', lead.id).eq('bot_paused', true).limit(1)
+      var inheritPaused = prevPausedResult.data?.length > 0
       var newConvResult = await supabase.from('conversations').insert({
-        lead_id: lead.id, business_id: business.id, branch_id: activeBranch?.id || null, status: 'activa'
+        lead_id: lead.id, business_id: business.id, branch_id: activeBranch?.id || null, status: 'activa', bot_paused: inheritPaused
       }).select().single()
       if (newConvResult.error) return NextResponse.json({ error: 'Error creating conversation' }, { status: 500 })
       conversation = newConvResult.data
