@@ -50,6 +50,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState('')
   const [filterStage, setFilterStage] = useState('all')
   const [filterBranch, setFilterBranch] = useState('all')
+  const [filterUnread, setFilterUnread] = useState(false)
   const [branches, setBranches] = useState([])
   const [tab, setTab] = useState('conversaciones')
   const [anticipos, setAnticipos] = useState([])
@@ -297,7 +298,17 @@ export default function Dashboard() {
     const phone = l.phone || ''
     const matchSearch = name.toLowerCase().includes(search.toLowerCase()) || phone.includes(search)
     const matchStage = filterStage === 'all' || l.stage === filterStage
-    return matchSearch && matchStage && matchesBranchFilter(l)
+    const lHasUnread = l.bot_paused && (l.unread_count > 0 || l.last_message?.role === 'lead')
+    const matchUnread = !filterUnread || lHasUnread
+    return matchSearch && matchStage && matchesBranchFilter(l) && matchUnread
+  }).sort((a, b) => {
+    const aU = a.bot_paused && (a.unread_count > 0 || a.last_message?.role === 'lead')
+    const bU = b.bot_paused && (b.unread_count > 0 || b.last_message?.role === 'lead')
+    if (aU && !bU) return -1
+    if (!aU && bU) return 1
+    const aT = new Date(a.last_message?.created_at || a.created_at).getTime()
+    const bT = new Date(b.last_message?.created_at || b.created_at).getTime()
+    return bT - aT
   })
 
   const byStage = Object.fromEntries(STAGES.map((s) => [s.key, []]))
@@ -516,6 +527,21 @@ export default function Dashboard() {
                   outline: 'none', boxSizing: 'border-box', marginBottom: '8px'
                 }}
               />
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                <button
+                  onClick={() => setFilterUnread(v => !v)}
+                  style={{
+                    padding: '5px 14px', borderRadius: '20px', border: '1px solid',
+                    fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                    background: filterUnread ? '#25d366' : '#fff',
+                    borderColor: filterUnread ? '#25d366' : '#e5e7eb',
+                    color: filterUnread ? '#fff' : '#374151',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  No leídos
+                </button>
+              </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <select
                   value={filterStage}
