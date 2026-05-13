@@ -10,6 +10,13 @@ function isAuthorized(request) {
   return authHeader === `Bearer ${process.env.CRON_SECRET}`
 }
 
+// Devuelve la hora actual en CDMX (0-23)
+function getHourCDMX() {
+  return new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' })
+  ).getHours()
+}
+
 export async function GET(request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -41,8 +48,16 @@ export async function GET(request) {
 
       if (!conversations?.length) continue
 
-      // Si alguna conversación tiene el bot pausado (asesor humano tomó control), no enviar seguimiento
-      if (conversations.some((c) => c.bot_paused)) continue
+      // Si un asesor humano tomó control en CUALQUIER conversación y nunca reactivó el bot,
+      // no enviar seguimiento automático bajo ninguna circunstancia
+      const { data: pausedConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('bot_paused', true)
+        .limit(1)
+
+      if (pausedConv?.length > 0) continue
 
       const convIds = conversations.map((c) => c.id)
 
@@ -84,6 +99,10 @@ export async function GET(request) {
 
       // ── Enviar seguimiento ─────────────────────────────────────────────
       if (decision.action === 'send_followup') {
+        // Solo enviar mensajes entre 7am y 9pm hora CDMX
+        const hourCDMX = getHourCDMX()
+        if (hourCDMX < 7 || hourCDMX >= 21) continue
+
         const message = await generateFollowUpMessage(
           lead,
           messages,
