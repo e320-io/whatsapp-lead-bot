@@ -730,9 +730,8 @@ export default function Dashboard() {
 
         {/* ── TAB: PIPELINE CRM ── */}
         {tab === 'pipeline' && (
-          <div style={{ display: 'flex', flex: 1, minWidth: 0, overflow: 'hidden' }}>
-          {/* Columnas kanban — siempre visibles, scroll horizontal propio */}
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, minWidth: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
 
             {/* Barra de filtros del pipeline */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
@@ -755,11 +754,11 @@ export default function Dashboard() {
               ))}
             </div>
 
-          <div style={{ display: 'flex', gap: '12px', padding: '16px', overflowX: 'auto', flex: 1 }}>
+          <div style={{ display: 'flex', gap: '12px', padding: '16px', overflowX: 'auto', overflowY: 'hidden', flex: 1, alignItems: 'flex-start' }}>
             {STAGES.map((stage) => {
               const stageLeads = byStage[stage.key] || []
               return (
-                <div key={stage.key} style={{ minWidth: '220px', width: '220px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div key={stage.key} style={{ minWidth: '220px', width: '220px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px', height: '100%' }}>
                   {/* Header columna */}
                   <div style={{
                     padding: '10px 14px', borderRadius: '10px',
@@ -785,7 +784,7 @@ export default function Dashboard() {
                   <div
                     style={{
                       display: 'flex', flexDirection: 'column', gap: '8px', flex: 1,
-                      overflowY: 'auto', maxHeight: 'calc(100vh - 185px)',
+                      overflowY: 'auto', flex: 1,
                       borderRadius: '10px', padding: '4px',
                       background: dragOverStage === stage.key ? stage.color + '18' : 'transparent',
                       border: dragOverStage === stage.key ? `2px dashed ${stage.color}` : '2px solid transparent',
