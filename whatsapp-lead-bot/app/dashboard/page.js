@@ -348,7 +348,11 @@ export default function Dashboard() {
   const byStage = Object.fromEntries(STAGES.map((s) => [s.key, []]))
   leads.filter(matchesBranchFilter).forEach((l) => {
     const rawKey = l.stage || 'sin_respuesta'
-    const key = LEGACY_STAGE_MAP[rawKey] || rawKey
+    const mappedKey = LEGACY_STAGE_MAP[rawKey] || rawKey
+    // "Esperando Respuesta": bot apagado + último mensaje del lead, ó stage notificacion_sucursal/esperando_respuesta
+    const isEsperando = mappedKey === 'esperando_respuesta'
+      || (l.bot_paused && l.last_message?.role === 'lead')
+    const key = isEsperando ? 'esperando_respuesta' : mappedKey
     if (byStage[key]) byStage[key].push(l)
     else byStage['sin_respuesta'].push(l)
   })
