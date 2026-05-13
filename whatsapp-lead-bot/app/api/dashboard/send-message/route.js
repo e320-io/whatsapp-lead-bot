@@ -36,24 +36,53 @@ export async function POST(request) {
       .eq('id', conversationId)
 
     if (message?.trim()) {
-      await sendWhatsAppMessage(lead.phone, message.trim())
+      let waResult
+      try {
+        waResult = await sendWhatsAppMessage(lead.phone, message.trim())
+      } catch (waErr) {
+        const errStr = waErr.message || ''
+        // Código 131047 = outside 24-hour customer-initiated window
+        const is24hBlock = errStr.includes('131047') || errStr.includes('outside the allowed window')
+        return NextResponse.json({
+          error: is24hBlock
+            ? 'El lead no ha escrito en las últimas 24 horas — WhatsApp bloquea mensajes salientes hasta que él/ella escriba primero. Pídele por otro medio que te mande un mensaje.'
+            : 'Error de WhatsApp al enviar: ' + errStr,
+          whatsapp_error: true,
+          window_expired: is24hBlock,
+        }, { status: 422, headers: CORS })
+      }
       await supabase.from('messages').insert({
         conversation_id: conversationId,
         business_id: lead.business_id,
         role: 'bot',
         content: message.trim(),
         is_human_agent: true,
+        whatsapp_message_id: waResult?.messages?.[0]?.id || null,
       })
     }
 
     if (imageUrl) {
-      await sendWhatsAppImage(lead.phone, imageUrl)
+      let waResult
+      try {
+        waResult = await sendWhatsAppImage(lead.phone, imageUrl)
+      } catch (waErr) {
+        const errStr = waErr.message || ''
+        const is24hBlock = errStr.includes('131047') || errStr.includes('outside the allowed window')
+        return NextResponse.json({
+          error: is24hBlock
+            ? 'El lead no ha escrito en las últimas 24 horas — WhatsApp bloquea mensajes salientes hasta que él/ella escriba primero. Pídele por otro medio que te mande un mensaje.'
+            : 'Error de WhatsApp al enviar imagen: ' + errStr,
+          whatsapp_error: true,
+          window_expired: is24hBlock,
+        }, { status: 422, headers: CORS })
+      }
       await supabase.from('messages').insert({
         conversation_id: conversationId,
         business_id: lead.business_id,
         role: 'bot',
         content: '[Imagen enviada: ' + imageUrl.split('/').pop() + ']',
         is_human_agent: true,
+        whatsapp_message_id: waResult?.messages?.[0]?.id || null,
       })
     }
 

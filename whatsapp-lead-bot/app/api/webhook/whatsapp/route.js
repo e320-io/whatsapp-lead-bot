@@ -82,6 +82,23 @@ export async function POST(request) {
     var changes = entry?.changes?.[0]
     var value = changes?.value
 
+    // Procesar callbacks de estado de entrega (sent, delivered, read, failed)
+    if (value?.statuses?.[0] && !value?.messages?.[0]) {
+      var statusUpdate = value.statuses[0]
+      if (statusUpdate.status === 'failed') {
+        var failErrors = statusUpdate.errors || []
+        var failCode = failErrors[0]?.code
+        var failTitle = failErrors[0]?.title || 'Error desconocido'
+        console.warn('⚠️ Mensaje fallido — ID:', statusUpdate.id, '| Código:', failCode, '| Motivo:', failTitle)
+        // Marcar el mensaje como fallido en BD para que el dashboard lo muestre
+        var supabaseStatus = createSupabaseAdmin()
+        await supabaseStatus.from('messages')
+          .update({ delivery_status: 'failed', delivery_error: failTitle })
+          .eq('whatsapp_message_id', statusUpdate.id)
+      }
+      return NextResponse.json({ status: 'status_update' })
+    }
+
     if (!value?.messages?.[0]) {
       return NextResponse.json({ status: 'no_message' })
     }
@@ -151,19 +168,36 @@ export async function POST(request) {
     }
 
     if (message.type !== 'text') {
-      // Verificar si el bot está pausado antes de responder
+      // Intentar guardar en BD para que el asesor lo vea, aunque no podamos leerlo
       var supabaseNonText = createSupabaseAdmin()
       var bizNonText = await supabaseNonText.from('businesses').select('id').limit(1).single()
-      var convNonText = bizNonText.data
-        ? await supabaseNonText.from('conversations')
-            .select('bot_paused')
+      if (bizNonText.data) {
+        var leadNonText = await supabaseNonText.from('leads').select('id').eq('phone', phoneNumber).eq('business_id', bizNonText.data.id).single()
+        if (leadNonText.data) {
+          var convNonText = await supabaseNonText.from('conversations')
+            .select('id, bot_paused')
             .eq('status', 'activa')
-            .eq('lead_id', (await supabaseNonText.from('leads').select('id').eq('phone', phoneNumber).eq('business_id', bizNonText.data.id).single()).data?.id)
+            .eq('lead_id', leadNonText.data.id)
             .order('created_at', { ascending: false })
             .limit(1)
             .single()
-        : { data: null }
-      if (convNonText.data?.bot_paused) return NextResponse.json({ status: 'bot_paused' })
+          if (convNonText.data) {
+            var typeLabels = { audio: '[Mensaje de voz 🎤]', sticker: '[Sticker]', location: '[Ubicación 📍]', contacts: '[Contacto]', video: '[Video 🎥]', reaction: '[Reacción]' }
+            var label = typeLabels[message.type] || '[Mensaje de tipo: ' + message.type + ']'
+            var dedupNT = await supabaseNonText.from('messages').select('id').eq('whatsapp_message_id', message.id).limit(1)
+            if (!dedupNT.data?.length) {
+              await supabaseNonText.from('messages').insert({
+                conversation_id: convNonText.data.id,
+                business_id: bizNonText.data.id,
+                role: 'lead',
+                content: label,
+                whatsapp_message_id: message.id,
+              })
+            }
+            if (convNonText.data.bot_paused) return NextResponse.json({ status: 'bot_paused' })
+          }
+        }
+      }
       await sendWhatsAppMessage(phoneNumber, 'Por el momento solo puedo leer mensajes de texto. ¿Podrías escribirme tu consulta? 😊')
       return NextResponse.json({ status: 'non_text_handled' })
     }
@@ -542,10 +576,11 @@ export async function POST(request) {
     }
 
     // 10. Guardar y enviar respuesta
+    var waOutResult = await sendWhatsAppMessage(phoneNumber, botReply)
     await supabase.from('messages').insert({
-      conversation_id: conversation.id, business_id: business.id, role: 'bot', content: botReply
+      conversation_id: conversation.id, business_id: business.id, role: 'bot', content: botReply,
+      whatsapp_message_id: waOutResult?.messages?.[0]?.id || null,
     })
-    await sendWhatsAppMessage(phoneNumber, botReply)
 
     // 10c. Enviar imagen automática si el contexto lo requiere (solo una vez por conversación)
     var appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
