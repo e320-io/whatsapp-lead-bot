@@ -349,9 +349,10 @@ export default function Dashboard() {
   leads.filter(matchesBranchFilter).forEach((l) => {
     const rawKey = l.stage || 'sin_respuesta'
     const mappedKey = LEGACY_STAGE_MAP[rawKey] || rawKey
-    // "Esperando Respuesta": bot apagado + último mensaje del lead, ó stage notificacion_sucursal/esperando_respuesta
+    // "Esperando Respuesta": stage notificacion_sucursal/esperando_respuesta
+    // ó bot apagado y el último mensaje NO fue del agente humano (lead o bot = alguien debe responder)
     const isEsperando = mappedKey === 'esperando_respuesta'
-      || (l.bot_paused && l.last_message?.role === 'lead')
+      || (l.bot_paused && l.last_message?.role !== 'human_agent')
     const key = isEsperando ? 'esperando_respuesta' : mappedKey
     if (byStage[key]) byStage[key].push(l)
     else byStage['sin_respuesta'].push(l)
@@ -729,7 +730,9 @@ export default function Dashboard() {
 
         {/* ── TAB: PIPELINE CRM ── */}
         {tab === 'pipeline' && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: '0 0 auto', width: selected ? '55%' : '100%', maxWidth: selected ? '55%' : '100%', transition: 'width 0.2s', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+          {/* Columnas kanban — siempre visibles, scroll horizontal propio */}
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden' }}>
 
             {/* Barra de filtros del pipeline */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
@@ -908,6 +911,96 @@ export default function Dashboard() {
               )
             })}
           </div>
+          </div>
+
+          {/* ── Panel derecho de conversación (inline en pipeline) ── */}
+          {selected && (
+            <div style={{
+              width: '420px', flexShrink: 0, borderLeft: '1px solid #e5e7eb',
+              display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden',
+            }}>
+              {/* Header */}
+              <div style={{ padding: '10px 16px', background: '#075e54', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%', background: '#25d366',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: '700', fontSize: '14px', flexShrink: 0,
+                }}>
+                  {(selected.name || selected.phone || '?')[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>{selected.name || 'Sin nombre'}</div>
+                  <div style={{ color: '#b2dfdb', fontSize: '11px' }}>{selected.phone} · {selected.branches?.name || 'Sin sucursal'}</div>
+                </div>
+                <button
+                  onClick={() => setSelected(null)}
+                  style={{ background: 'none', border: 'none', color: '#b2dfdb', fontSize: '18px', cursor: 'pointer', lineHeight: 1, padding: '4px' }}
+                >×</button>
+              </div>
+              {/* Mensajes */}
+              <div ref={messagesContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '12px', background: '#e5ddd5', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {loadingMsgs ? (
+                  <div style={{ textAlign: 'center', color: '#6b7280', padding: '20px', fontSize: '13px' }}>Cargando...</div>
+                ) : buildChatItems().map((item, i) => {
+                  if (item.type === 'separator') {
+                    const cv = item.data
+                    return (
+                      <div key={`sep-${i}`} style={{ textAlign: 'center', margin: '8px 0' }}>
+                        <span style={{ background: '#fff', borderRadius: '12px', padding: '3px 10px', fontSize: '11px', color: '#6b7280', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
+                          {cv ? `Conversación · ${cv.status}` : 'Conversación'}
+                        </span>
+                      </div>
+                    )
+                  }
+                  const m = item.data
+                  const isBot = m.role === 'bot'
+                  const isLead = m.role === 'lead'
+                  return (
+                    <div key={m.id || i} style={{ display: 'flex', justifyContent: isLead ? 'flex-start' : 'flex-end' }}>
+                      <div style={{
+                        maxWidth: '80%', padding: '8px 12px', borderRadius: isLead ? '0 12px 12px 12px' : '12px 0 12px 12px',
+                        background: isLead ? '#fff' : isBot ? '#dcf8c6' : '#c8e6ff',
+                        fontSize: '12px', color: '#111827', lineHeight: '1.45',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                      }}>
+                        {!isBot && !isLead && <div style={{ fontSize: '10px', fontWeight: '600', color: '#2563eb', marginBottom: '2px' }}>Agente</div>}
+                        <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.content}</div>
+                        <div style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'right', marginTop: '2px' }}>
+                          {new Date(m.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+              {/* Input solo si hay conversación activa y bot pausado */}
+              {activeConv && botPaused && (
+                <div style={{ padding: '8px 12px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: '8px', background: '#f9fafb' }}>
+                  <textarea
+                    value={humanMessage}
+                    onChange={(e) => setHumanMessage(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendHumanMessage() } }}
+                    placeholder="Escribe tu mensaje... (Enter para enviar)"
+                    rows={1}
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: '16px', border: '1px solid #e5e7eb', fontSize: '13px', resize: 'none', outline: 'none', fontFamily: 'system-ui, sans-serif', maxHeight: '80px', lineHeight: '1.4' }}
+                  />
+                  <button onClick={handleSendHumanMessage} disabled={sendingHuman || !humanMessage.trim()}
+                    style={{ padding: '8px 16px', borderRadius: '16px', border: 'none', background: sendingHuman || !humanMessage.trim() ? '#9ca3af' : '#075e54', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    {sendingHuman ? '...' : 'Enviar'}
+                  </button>
+                </div>
+              )}
+              {activeConv && !botPaused && (
+                <div style={{ padding: '8px 12px', borderTop: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', justifyContent: 'center' }}>
+                  <button onClick={() => handleTakeover(true)} disabled={takingOver}
+                    style={{ padding: '7px 18px', borderRadius: '16px', border: 'none', background: '#075e54', color: '#fff', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                    {takingOver ? '...' : 'Tomar conversación'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           </div>
         )}
 
@@ -1310,8 +1403,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── PANEL DERECHO: CONVERSACIÓN ── */}
-        {!selected && tab === 'conversaciones' ? (
+        {/* ── PANEL DERECHO: CONVERSACIÓN (solo en tab conversaciones) ── */}
+        {tab !== 'pipeline' && (!selected && tab === 'conversaciones' ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
             <div style={{ fontSize: '56px', marginBottom: '16px' }}>💬</div>
             <div style={{ fontSize: '18px', fontWeight: '600', color: '#374151' }}>Selecciona un lead</div>
@@ -1605,7 +1698,7 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        ) : null}
+        ) : null)}
       </div>
     </div>
   )
